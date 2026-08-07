@@ -268,7 +268,11 @@ export default function App() {
       <h1 className="persistent-folder-title">Folder</h1>
       <span className="persistent-card-divider" aria-hidden="true" />
       <span className="persistent-table-grid" aria-hidden="true"><i /><i /><i /><i /></span>
-      {page === "starter" ? <StarterFolder onBack={() => { setSelectedFileId(null); setPage("folders"); }} selectedId={selectedFileId} onSelect={setSelectedFileId} /> : <section className="content-area">
+      <div className={`content-layer detail-layer${page === "starter" ? " is-active" : ""}`} aria-hidden={page !== "starter"}>
+        <StarterFolder onBack={() => { setSelectedFileId(null); setPage("folders"); }} selectedId={selectedFileId} onSelect={setSelectedFileId} />
+      </div>
+      <div className={`content-layer home-layer${page === "folders" ? " is-active" : ""}`} aria-hidden={page !== "folders"}>
+        <section className="content-area">
         <article className="folder-card">
           <header className="card-header">
             <div><div className="home-title"><h1>Folder</h1></div><p>File storage for your agents and applications.</p></div>
@@ -303,7 +307,8 @@ export default function App() {
             </footer>
           </div>
         </article>
-      </section>}
+        </section>
+      </div>
       </section>
 
       {dialogOpen && <div className="dialog-backdrop" onMouseDown={() => setDialogOpen(false)}>
