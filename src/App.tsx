@@ -77,6 +77,7 @@ function StarterFolder({ onBack, selectedId, onSelect }: { onBack: () => void; s
   const [detailFiles, setDetailFiles] = useState(starterFiles);
   const [openMenu, setOpenMenu] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
+  const [previewClosing, setPreviewClosing] = useState(false);
 
   function uploadFiles(list: FileList | null) {
     if (!list?.length) return;
@@ -94,6 +95,15 @@ function StarterFolder({ onBack, selectedId, onSelect }: { onBack: () => void; s
   }
 
   const selectedFile = detailFiles.find((file) => file.id === selectedId) || null;
+
+  function closePreview() {
+    if (previewClosing) return;
+    setPreviewClosing(true);
+    window.setTimeout(() => {
+      onSelect(null);
+      setPreviewClosing(false);
+    }, 360);
+  }
 
   async function copyLink(file: StarterFile) {
     const link = `${window.location.origin}${window.location.pathname}#folder/${encodeURIComponent(file.name)}`;
@@ -118,14 +128,14 @@ function StarterFolder({ onBack, selectedId, onSelect }: { onBack: () => void; s
   ];
 
   return (
-    <section className={`starter-page${selectedFile ? " preview-open" : ""}`}>
+    <section className={`starter-page${selectedFile ? " preview-open" : ""}${previewClosing ? " preview-closing" : ""}`}>
       <div className="starter-main-pane">
         <div className="back-bar"><button onClick={onBack}><Icon name="arrow-left.svg" size={10} />Back</button></div>
         <div className="starter-card-wrap">
         <div className="starter-card-head">
           <div className="starter-heading">
             <div><h1>Folder</h1><span className="starter-badge">Starter</span></div>
-            <div className="folder-meta"><span>Files <strong>{String(detailFiles.length).padStart(2, "0")}</strong></span><Icon name="meta-separator.svg" size={8} /><span>Size <strong>2.4 KB</strong></span></div>
+            <div className="folder-meta"><span>Files <strong>{String(detailFiles.length).padStart(2, "0")}</strong></span><span>Size <strong>2.4 KB</strong></span></div>
           </div>
           <label className="upload-button"><Icon name="upload.svg" size={10} />Upload<input type="file" multiple onChange={(event) => uploadFiles(event.target.files)} /></label>
         </div>
@@ -157,7 +167,7 @@ function StarterFolder({ onBack, selectedId, onSelect }: { onBack: () => void; s
       </div>
 
       {selectedFile && <aside className="file-preview" aria-label={`${selectedFile.name} preview`}>
-        <div className="preview-close-bar"><button onClick={() => onSelect(null)}><Icon name="close.svg" size={10} />Close</button></div>
+        <div className="preview-close-bar"><button onClick={closePreview}><Icon name="close.svg" size={10} />Close</button></div>
         <div className="preview-card" key={selectedFile.id}>
           <header className="preview-header">
             <div className="preview-title"><h2>{selectedFile.name}</h2><div><span>/{selectedFile.name}</span><Icon name="meta-separator.svg" size={8} /><span>{selectedFile.size}</span><Icon name="meta-separator.svg" size={8} /><span>Aug</span></div></div>
@@ -203,6 +213,11 @@ export default function App() {
     setDialogOpen(false);
   }
 
+  function openStarterFolder(fileId: number | null = null) {
+    setSelectedFileId(fileId);
+    setPage("starter");
+  }
+
   return (
     <main className={`app-shell ${page === "starter" ? "detail-view" : "home-view"}`}>
       <aside className="sidebar">
@@ -229,7 +244,7 @@ export default function App() {
               <div className={`nav-collapse${folderOpen ? " is-open" : ""}`}><div><div className="file-list">
                   {files.map((file, index) => {
                     const match = starterFiles.find((item) => item.name.toLowerCase() === file.toLowerCase());
-                    return <button style={{ "--nav-index": index } as CSSProperties} className={match?.id === selectedFileId ? "selected-sidebar-file" : ""} key={file} onClick={() => { setPage("starter"); if (match) setSelectedFileId(match.id); }}><Icon name="file.svg" /> <span>{file}</span></button>;
+                    return <button style={{ "--nav-index": index } as CSSProperties} className={match?.id === selectedFileId ? "selected-sidebar-file" : ""} key={file} onClick={() => openStarterFolder(match?.id ?? null)}><Icon name="file.svg" /> <span>{file}</span></button>;
                   })}
               </div></div></div>
               <button className="folder-nav" aria-expanded={websiteOpen} onClick={() => setWebsiteOpen((open) => !open)}><Icon name="chevron.svg" className={`nav-chevron${websiteOpen ? " is-open" : ""}`} />Website Asset</button>
@@ -249,6 +264,10 @@ export default function App() {
         </div>
       </aside>
 
+      <section className={`content-stage${selectedFileId !== null ? " has-preview" : ""}`}>
+      <h1 className="persistent-folder-title">Folder</h1>
+      <span className="persistent-card-divider" aria-hidden="true" />
+      <span className="persistent-table-grid" aria-hidden="true"><i /><i /><i /><i /></span>
       {page === "starter" ? <StarterFolder onBack={() => { setSelectedFileId(null); setPage("folders"); }} selectedId={selectedFileId} onSelect={setSelectedFileId} /> : <section className="content-area">
         <article className="folder-card">
           <header className="card-header">
@@ -260,7 +279,7 @@ export default function App() {
             <div className="folder-table" role="table" aria-label="Folder list">
               <div className="table-row table-head" role="row"><span>Name</span><span>Storage</span><span>Created</span><span /></div>
               {visibleFolders.map((folder) => (
-                <div style={{ "--row-index": folders.indexOf(folder) } as CSSProperties} className={`table-row${folder.starter ? " clickable-row" : ""}`} role="row" key={folder.id} onClick={() => folder.starter && setPage("starter")} tabIndex={folder.starter ? 0 : undefined} onKeyDown={(event) => { if (folder.starter && (event.key === "Enter" || event.key === " ")) setPage("starter"); }}>
+                <div style={{ "--row-index": folders.indexOf(folder) } as CSSProperties} className={`table-row${folder.starter ? " clickable-row" : ""}`} role="row" key={folder.id} onClick={() => folder.starter && openStarterFolder()} tabIndex={folder.starter ? 0 : undefined} onKeyDown={(event) => { if (folder.starter && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); openStarterFolder(); } }}>
                   <span className="folder-name"><Icon name="folder.svg" size={16} /><span>{folder.name}</span>{folder.starter && <span className="badge">Starter</span>}</span>
                   <span>{folder.storage}</span><span>{folder.created}</span>
                   <span className="row-actions">
@@ -285,6 +304,7 @@ export default function App() {
           </div>
         </article>
       </section>}
+      </section>
 
       {dialogOpen && <div className="dialog-backdrop" onMouseDown={() => setDialogOpen(false)}>
         <form className="dialog" onSubmit={createFolder} onMouseDown={(e) => e.stopPropagation()}>
