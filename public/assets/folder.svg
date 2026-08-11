@@ -1,3 +1,9 @@
-<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="14.6667" height="13.3335" viewBox="0 0 14.6667 13.3335" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path id="Icon" d="M8 3.33348L7.25631 1.84609C7.04227 1.41801 6.93524 1.20396 6.77558 1.04759C6.63439 0.909297 6.46422 0.804126 6.27738 0.739683C6.06611 0.66681 5.82681 0.66681 5.34819 0.66681H2.8C2.05326 0.66681 1.6799 0.66681 1.39468 0.812135C1.1438 0.939966 0.939824 1.14394 0.811992 1.39482C0.666668 1.68004 0.666668 2.05341 0.666668 2.80014V3.33348M0.666668 3.33348H10.8C11.9201 3.33348 12.4802 3.33348 12.908 3.55146C13.2843 3.74321 13.5903 4.04917 13.782 4.4255C14 4.85332 14 5.41337 14 6.53348V9.46681C14 10.5869 14 11.147 13.782 11.5748C13.5903 11.9511 13.2843 12.2571 12.908 12.4488C12.4802 12.6668 11.9201 12.6668 10.8 12.6668H3.86667C2.74656 12.6668 2.18651 12.6668 1.75869 12.4488C1.38236 12.2571 1.0764 11.9511 0.884655 11.5748C0.666668 11.147 0.666668 10.5869 0.666668 9.46681V3.33348Z" stroke="#7A7A7A" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round"/>
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="11.5" height="10.5" viewBox="0 0 11.5 10.5" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Group">
+<path id="Vector" d="M2.5 2H5.364L5.066 1.364C4.819 0.837 4.29 0.5 3.708 0.5H2C1.172 0.5 0.5 1.172 0.5 2V4C0.5 2.895 1.395 2 2.5 2Z" fill="#0A0A0A"/>
+<path id="Vector_2" d="M11 8H7" stroke="#0A0A0A" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_3" d="M9 10V6" stroke="#0A0A0A" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_4" d="M0.5 4V2C0.5 1.17157 1.17157 0.5 2 0.5H3.70956C4.29952 0.5 4.83469 0.84582 5.0771 1.38368L5.23623 1.73677" stroke="#0A0A0A" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_5" d="M11 4.5V4C11 2.89543 10.1046 2 9 2H2.5C1.39543 2 0.5 2.89543 0.5 4V7.5C0.5 8.60457 1.39543 9.5 2.5 9.5H5" stroke="#0A0A0A" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
 </svg>

@@ -1,3 +1,6 @@
-<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path id="Icon" d="M9.5 9.5L7.75005 7.75M9 4.75C9 7.09721 7.09721 9 4.75 9C2.40279 9 0.5 7.09721 0.5 4.75C0.5 2.40279 2.40279 0.5 4.75 0.5C7.09721 0.5 9 2.40279 9 4.75Z" stroke="#8F8F8F" stroke-linecap="round" stroke-linejoin="round"/>
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="10.5" height="10.5" viewBox="0 0 10.5 10.5" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Group">
+<path id="Vector" d="M6.902 6.902L10 10" stroke="#7A7A7A" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_2" d="M4.25 8C6.32107 8 8 6.32107 8 4.25C8 2.17893 6.32107 0.5 4.25 0.5C2.17893 0.5 0.5 2.17893 0.5 4.25C0.5 6.32107 2.17893 8 4.25 8Z" stroke="#7A7A7A" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
 </svg>
