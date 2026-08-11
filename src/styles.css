@@ -22,10 +22,12 @@ html, body, #root {
 button { font: inherit; color: inherit; }
 
 .appShell { width: 100%; height: 100dvh; overflow: hidden; background: #fff; font-size: 12px; line-height: 18px; }
-.sidebar { position: fixed; inset: 0 auto 0 0; width: 216px; display: flex; flex-direction: column; justify-content: space-between; padding: 12px 8px; overflow: hidden; border-right: .5px solid var(--border); background: #fff; }
+.sidebar { position: fixed; inset: 0 auto 0 0; width: 216px; display: flex; flex-direction: column; justify-content: space-between; padding: 12px 8px; overflow: hidden; border-right: .5px solid var(--border); background: #fff; will-change: width; }
 .sidebar.collapsed { width: 43px; }
 .sidebarTop { display: flex; flex-direction: column; gap: 8px; width: 100%; }
-.workspaceRow { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; }
+.workspaceRow { display: flex; width: 100%; height: 26px; flex: 0 0 26px; align-items: center; justify-content: space-between; padding: 4px 28px 4px 8px; }
+.workspaceRow > .iconButton,
+.collapsedToggleRow > .toggleButton { position: absolute; top: 16px; right: 8px; }
 .workspaceName { display: flex; align-items: center; gap: 6px; }
 .organizationControl { position: relative; min-width: 0; }
 .workspaceName { padding: 0; }
@@ -93,28 +95,44 @@ button { font: inherit; color: inherit; }
 .icon { display: block; width: 12px; height: 12px; flex: 0 0 12px; object-fit: contain; }
 .sidebarActions { display: flex; flex-direction: column; margin-bottom: 20px; }
 button { border: 0; background: transparent; cursor: pointer; }
-.searchButton { position: relative; display: flex; width: 100%; align-items: center; justify-content: space-between; padding: 4px 8px; border: .5px solid rgba(0,0,0,.2); border-radius: 4px; color: var(--muted); background: #fff; box-shadow: 0 .5px 1px -1px rgba(0,0,0,.1), inset 0 .5px .5px rgba(255,255,255,.25), inset 0 -.5px .5px rgba(0,0,0,.1); }
+.searchButton { position: relative; display: flex; width: 100%; height: 26px; flex: 0 0 26px; align-items: center; justify-content: space-between; padding: 4px 8px; overflow: hidden; border: .5px solid rgba(0,0,0,.2); border-radius: 4px; color: var(--muted); background: #fff; box-shadow: 0 .5px 1px -1px rgba(0,0,0,.1), inset 0 .5px .5px rgba(255,255,255,.25), inset 0 -.5px .5px rgba(0,0,0,.1); }
 .searchButton span, .plainButton { display: flex; align-items: center; gap: 6px; }
 .searchButton.searching { color: #0a0a0a; }
 .searchButton input { width: 100%; min-width: 0; height: 18px; padding: 0 6px; border: 0; outline: 0; color: #0a0a0a; background: transparent; font: inherit; line-height: 18px; }
 .searchButton input::placeholder { color: var(--muted); opacity: 1; }
 .clearSearch { display: flex; width: 12px; height: 12px; flex: 0 0 12px; align-items: center; justify-content: center; padding: 0; }
-.plainButton { width: 100%; padding: 4px 8px; text-align: left; border-radius: 4px; }
-.folderList { display: flex; flex-direction: column; gap: 4px; }
+.plainButton { width: 100%; height: 26px; flex: 0 0 26px; padding: 4px 8px; overflow: hidden; text-align: left; white-space: nowrap; border-radius: 4px; }
+.folderList { display: flex; flex-direction: column; gap: 4px; opacity: 1; transition: opacity 100ms ease 100ms; }
+.folderList.concealed { opacity: 0; pointer-events: none; transition-delay: 0ms; }
 .folderRow { display: flex; width: 100%; min-height: 22px; align-items: center; justify-content: space-between; padding: 2px 8px; border-radius: 4px; text-align: left; }
 .folderRow.active { background: var(--surface); }
 .sidebarBottom { width: 100%; }
 .utilityLinks { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; }
-.utilityLinks .plainButton { padding-top: 2px; padding-bottom: 2px; }
-.accountRow { display: flex; width: 100%; align-items: center; gap: 6px; padding: 10px 8px 2px; border-radius: 4px; text-align: left; }
+.utilityLinks .plainButton { padding-top: 4px; padding-bottom: 4px; }
+.accountRow { display: flex; width: 100%; height: 26px; flex: 0 0 26px; align-items: center; gap: 6px; padding: 4px 8px; overflow: hidden; border-radius: 4px; text-align: left; white-space: nowrap; }
 .accountRow span { flex: 1; }
 .avatar { width: 12px; height: 12px; flex: 0 0 12px; border: .3px solid rgba(0,0,0,.08); border-radius: 50%; object-fit: cover; }
-.sidebar.collapsed .sidebarActions { margin-bottom: 0; }
 .sidebar.collapsed .searchButton,
-.sidebar.collapsed .plainButton { width: 26px; height: 26px; justify-content: center; padding: 4px 7px; }
+.sidebar.collapsed .plainButton { height: 26px; justify-content: center; gap: 0; padding: 4px 7px; }
 .sidebar.collapsed .searchButton span { gap: 0; }
 .sidebar.collapsed .utilityLinks { align-items: center; }
-.sidebar.collapsed .accountRow { width: 26px; height: 26px; justify-content: center; gap: 2px; padding: 2px 1px; }
+.sidebar.collapsed .accountRow { height: 26px; justify-content: center; gap: 0; padding: 2px 1px; }
+.organizationControl,
+.sidebarLabel,
+.accountChevronIcon,
+.searchButton input,
+.searchButton > .icon:last-child { opacity: 1; transition: opacity 100ms ease 100ms, width 160ms cubic-bezier(.22, 1, .36, 1); }
+.sidebar.collapsed .organizationControl,
+.sidebar.collapsed .sidebarLabel,
+.sidebar.collapsed .accountChevronIcon,
+.sidebar.collapsed .searchButton input,
+.sidebar.collapsed .searchButton > .icon:last-child { width: 0; min-width: 0; flex-basis: 0; padding: 0; opacity: 0; pointer-events: none; transition-delay: 0ms; }
+.sidebar.collapsed .searchButton input { width: 0; flex: 0 0 0; padding: 0; }
+.sidebar.collapsed .sidebarLabel,
+.sidebar.collapsed .accountChevronIcon { width: 0; min-width: 0; flex: 0 0 0; }
+.sidebarLabel { overflow: hidden; text-overflow: clip; white-space: nowrap; transition-property: opacity, width, flex-basis; }
+.accountChevronIcon { display: flex; width: 12px; height: 12px; flex: 0 0 12px; }
+.sidebar.collapsed .accountChevronIcon { width: 0; min-width: 0; flex-basis: 0; overflow: hidden; }
 .newFolderBackdrop { position: fixed; z-index: 1400; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,.05); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 .newFolderModal { display: flex; width: 400px; max-width: 100%; flex-direction: column; gap: 12px; padding: 12px 8px 8px; border: .5px solid var(--border); border-radius: 12px; background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.08); }
 .newFolderModal header { display: flex; height: 18px; align-items: center; gap: 4px; padding: 0 8px; }
@@ -148,9 +166,8 @@ button { border: 0; background: transparent; cursor: pointer; }
   overscroll-behavior: none;
 }
 .sidebar,
-.content { transition: width 160ms ease, margin-left 160ms ease; }
+.content { transition: width 240ms cubic-bezier(.22, 1, .36, 1), margin-left 240ms cubic-bezier(.22, 1, .36, 1); }
 .sidebarCollapsed .content { margin-left: 43px; }
-.sidebarCollapsed .contentGrid { grid-template-columns: minmax(560px, 973px) minmax(180px, 1fr); }
 h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; font-weight: 400; }
 .emptyBeamState { display: flex; width: 100%; height: calc(100dvh - 62px); min-height: 0; flex-direction: column; align-items: center; justify-content: center; gap: 24px; text-align: center; }
 .emptyBeamIllustration { display: block; width: 228.863px; height: 250px; object-fit: contain; }

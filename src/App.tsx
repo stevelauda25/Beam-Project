@@ -130,13 +130,6 @@ function Sidebar({ folders: sidebarFolders, activeFolderName, isCollapsed, isSea
     <>
     <aside className={`sidebar${isCollapsed ? ' collapsed' : ''}`}>
       <div className="sidebarTop">
-        {isCollapsed ? (
-          <div className="collapsedToggleRow">
-            <button className="iconButton toggleButton" onClick={onToggle} aria-label="Expand sidebar" title="Expand sidebar">
-              <Icon src={icons.panelExpand} />
-            </button>
-          </div>
-        ) : (
           <div className="workspaceRow">
             <div className="organizationControl" data-org-menu>
               <button className="workspaceName" onClick={() => setIsOrgMenuOpen((open) => !open)} aria-haspopup="menu" aria-expanded={isOrgMenuOpen}>
@@ -173,19 +166,13 @@ function Sidebar({ folders: sidebarFolders, activeFolderName, isCollapsed, isSea
                 </div>
               )}
             </div>
-            <button className="iconButton" onClick={onToggle} aria-label="Collapse sidebar" title="Collapse sidebar">
-              <Icon src={icons.panel} />
+            <button className="iconButton toggleButton" onClick={onToggle} aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+              <Icon src={isCollapsed ? icons.panelExpand : icons.panel} />
             </button>
           </div>
-        )}
 
         <div className="sidebarActions">
-          {isCollapsed ? (
-            <button className="searchButton" aria-label="Search all files" title="Search all files" onClick={onStartSearch}>
-              <span><Icon src={icons.search} /></span>
-            </button>
-          ) : (
-            <label className={`searchButton${isSearching ? ' searching' : ''}`}>
+            <label className={`searchButton${isSearching ? ' searching' : ''}`} onClick={() => { if (isCollapsed) onStartSearch() }}>
               <Icon src={icons.search} />
               <input
                 autoFocus={isSearching}
@@ -199,32 +186,29 @@ function Sidebar({ folders: sidebarFolders, activeFolderName, isCollapsed, isSea
                 <button type="button" className="clearSearch" aria-label="Clear search" onClick={() => onSearchChange('')}><Icon src={icons.searchClear} /></button>
               ) : <Icon src={icons.shortcut} />}
             </label>
-          )}
           <button className="plainButton" aria-label="New folder" title={isCollapsed ? 'New folder' : undefined} onClick={() => setIsNewFolderOpen(true)}>
-            <Icon src={icons.folder} />{!isCollapsed && 'New folder'}
+            <Icon src={icons.folder} /><span className="sidebarLabel">New folder</span>
           </button>
         </div>
 
-        {!isCollapsed && !isSearching && (
-          <nav className="folderList" aria-label="Folders">
+          <nav className={`folderList${isCollapsed || isSearching ? ' concealed' : ''}`} aria-label="Folders" aria-hidden={isCollapsed || isSearching}>
             {sidebarFolders.map((folder) => (
-              <button className={`folderRow${folder.name === activeFolderName ? ' active' : ''}`} key={folder.name} onClick={() => onOpenFolder(folder.name)}>
+              <button className={`folderRow${folder.name === activeFolderName ? ' active' : ''}`} key={folder.name} tabIndex={isCollapsed || isSearching ? -1 : 0} onClick={() => onOpenFolder(folder.name)}>
                 <span>{folder.name}</span><span>{folder.count}</span>
               </button>
             ))}
           </nav>
-        )}
       </div>
 
       <div className="sidebarBottom">
         <div className="utilityLinks">
-          <button className="plainButton" aria-label="API Keys" title={isCollapsed ? 'API Keys' : undefined}><Icon src={icons.key} />{!isCollapsed && 'API Keys'}</button>
-          <button className="plainButton" aria-label="Settings" title={isCollapsed ? 'Settings' : undefined}><Icon src={icons.settings} />{!isCollapsed && 'Settings'}</button>
+          <button className="plainButton" aria-label="API Keys" title={isCollapsed ? 'API Keys' : undefined}><Icon src={icons.key} /><span className="sidebarLabel">API Keys</span></button>
+          <button className="plainButton" aria-label="Settings" title={isCollapsed ? 'Settings' : undefined}><Icon src={icons.settings} /><span className="sidebarLabel">Settings</span></button>
         </div>
         <button className="accountRow" aria-label="Michele J. account" title={isCollapsed ? 'Michele J.' : undefined}>
           <img className="avatar" src={icons.avatar} alt="Michele J." />
-          {!isCollapsed && <span>Michele J.</span>}
-          <Icon src={isCollapsed ? icons.accountChevronCollapsed : icons.accountChevron} />
+          <span className="sidebarLabel">Michele J.</span>
+          <span className="accountChevronIcon"><Icon src={isCollapsed ? icons.accountChevronCollapsed : icons.accountChevron} /></span>
         </button>
       </div>
     </aside>
