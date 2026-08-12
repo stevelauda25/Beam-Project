@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import ApiKeysPage from './components/ApiKeysPage'
 
 const icons = {
   personal: '/assets/personal.svg',
@@ -25,6 +26,7 @@ const icons = {
   previewClose: '/assets/preview-close.svg',
   previewInfo: '/assets/preview-info.svg',
   previewCopy: '/assets/preview-copy.svg',
+  previewShare: '/assets/preview-share.svg',
   copySuccess: '/assets/copy-success.svg',
   downloadSuccess: '/assets/download-success.svg',
   previewDownload: '/assets/preview-download.svg',
@@ -61,7 +63,7 @@ type CopyFeedback = { status: 'success' | 'failure'; fileName: string } | null
 type DownloadFeedback = { status: 'success' | 'failure'; file: FolderFile } | null
 
 const initialFolderFiles: FolderFile[] = [
-  { name: 'backup-prompt.md', kind: 'md', size: '1KB', modified: '4 days ago' },
+  { name: 'backup-prompt.md', kind: 'md', size: '869B', modified: '4 days ago' },
   { name: 'folder.md', kind: 'md', size: '869B', modified: '5 days ago' },
   { name: 'getting-started.md', kind: 'md', size: '278B', modified: '5 days ago' },
   { name: 'organize-thoughts-prompt.md', kind: 'md', size: '253B', modified: '6 days ago' },
@@ -102,9 +104,11 @@ type SidebarProps = {
   onSearchChange: (query: string) => void
   onOpenFolder: (name: string) => void
   onCreateFolder: (name: string) => void
+  isApiKeysActive: boolean
+  onOpenApiKeys: () => void
 }
 
-function Sidebar({ folders: sidebarFolders, activeFolderName, isCollapsed, isSearching, searchQuery, onToggle, onStartSearch, onSearchChange, onOpenFolder, onCreateFolder }: SidebarProps) {
+function Sidebar({ folders: sidebarFolders, activeFolderName, isCollapsed, isSearching, searchQuery, onToggle, onStartSearch, onSearchChange, onOpenFolder, onCreateFolder, isApiKeysActive, onOpenApiKeys }: SidebarProps) {
   const [isOrgMenuOpen, setIsOrgMenuOpen] = useState(false)
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false)
   const [activeOrganization, setActiveOrganization] = useState('Personal')
@@ -193,7 +197,7 @@ function Sidebar({ folders: sidebarFolders, activeFolderName, isCollapsed, isSea
 
           <nav className={`folderList${isCollapsed || isSearching ? ' concealed' : ''}`} aria-label="Folders" aria-hidden={isCollapsed || isSearching}>
             {sidebarFolders.map((folder) => (
-              <button className={`folderRow${folder.name === activeFolderName ? ' active' : ''}`} key={folder.name} tabIndex={isCollapsed || isSearching ? -1 : 0} onClick={() => onOpenFolder(folder.name)}>
+              <button className={`folderRow${!isApiKeysActive && folder.name === activeFolderName ? ' active' : ''}`} key={folder.name} tabIndex={isCollapsed || isSearching ? -1 : 0} onClick={() => onOpenFolder(folder.name)}>
                 <span>{folder.name}</span><span>{folder.count}</span>
               </button>
             ))}
@@ -202,7 +206,7 @@ function Sidebar({ folders: sidebarFolders, activeFolderName, isCollapsed, isSea
 
       <div className="sidebarBottom">
         <div className="utilityLinks">
-          <button className="plainButton" aria-label="API Keys" title={isCollapsed ? 'API Keys' : undefined}><Icon src={icons.key} /><span className="sidebarLabel">API Keys</span></button>
+          <button className={`plainButton${isApiKeysActive ? ' active' : ''}`} aria-label="API Keys" title={isCollapsed ? 'API Keys' : undefined} onClick={onOpenApiKeys}><Icon src={icons.key} /><span className="sidebarLabel">API Keys</span></button>
           <button className="plainButton" aria-label="Settings" title={isCollapsed ? 'Settings' : undefined}><Icon src={icons.settings} /><span className="sidebarLabel">Settings</span></button>
         </div>
         <button className="accountRow" aria-label="Michele J. account" title={isCollapsed ? 'Michele J.' : undefined}>
@@ -375,6 +379,10 @@ function fileSizeInBytes(size: string) {
   if (size.endsWith('MB')) return value * 1024 * 1024
   if (size.endsWith('KB')) return value * 1024
   return value
+}
+
+function formatDisplayFileSize(size: string) {
+  return size.replace(/\s*(B|KB|MB|GB)$/i, ' $1')
 }
 
 function FolderDetail({ folderName, initialItems, onItemsChange, onBack }: { folderName: string; initialItems: FolderFile[]; onItemsChange: (items: FolderFile[]) => void; onBack: () => void }) {
@@ -738,9 +746,84 @@ function DownloadToast({ feedback, onRetry, onClose }: { feedback: NonNullable<D
   )
 }
 
+type EditorToolbarPosition = { left: number; top: number }
+
+const editorIcons = {
+  chevron: '/assets/editor-chevron.svg', bold: '/assets/editor-bold.svg', italic: '/assets/editor-italic.svg',
+  underline: '/assets/editor-underline.svg', divider: '/assets/editor-divider.svg',
+  list: '/assets/editor-list.svg', link: '/assets/editor-link.svg', image: '/assets/editor-image.svg',
+} as const
+
+function TextEditorToolbar({ position, blockStyle, isBulleted, onFormat }: { position: EditorToolbarPosition; blockStyle: 'Header 1' | 'Body'; isBulleted: boolean; onFormat: (command: string, value?: string) => void }) {
+  const [isHeadingMenuOpen, setIsHeadingMenuOpen] = useState(false)
+  const [openEditorPanel, setOpenEditorPanel] = useState<'color' | 'link' | null>(null)
+  const [linkUrl, setLinkUrl] = useState('')
+  const [nextAlignment, setNextAlignment] = useState<'center' | 'right' | 'left'>('center')
+  const applyBlockStyle = (style: 'Header 1' | 'Body') => {
+    setIsHeadingMenuOpen(false)
+    onFormat('formatBlock', style === 'Header 1' ? 'h1' : 'p')
+  }
+  const applyLink = () => {
+    const normalizedUrl = linkUrl.trim()
+    if (!normalizedUrl) return
+    onFormat('createLink', normalizedUrl)
+    setLinkUrl('')
+    setOpenEditorPanel(null)
+  }
+  const insertImage = (file: File | undefined) => {
+    if (!file?.type.startsWith('image/')) return
+    const reader = new FileReader()
+    reader.addEventListener('load', () => {
+      if (typeof reader.result === 'string') onFormat('insertImage', reader.result)
+    })
+    reader.readAsDataURL(file)
+  }
+  const iconButton = (label: string, icon: string, command: string, className = '') => (
+    <button className={className} type="button" aria-label={label} title={label} onMouseDown={(event) => event.preventDefault()} onClick={() => onFormat(command)}><img src={icon} alt="" /></button>
+  )
+  const cycleAlignment = () => {
+    onFormat(nextAlignment === 'center' ? 'justifyCenter' : nextAlignment === 'right' ? 'justifyRight' : 'justifyLeft')
+    setNextAlignment(nextAlignment === 'center' ? 'right' : nextAlignment === 'right' ? 'left' : 'center')
+  }
+  return (
+    <div className="textEditorToolbar" style={position} role="toolbar" aria-label="Text formatting" onMouseDown={(event) => event.stopPropagation()} onContextMenu={(event) => event.preventDefault()}>
+      <div className="editorGroup editorHeadingGroup">
+        <button className="editorHeadingTrigger" type="button" aria-haspopup="menu" aria-expanded={isHeadingMenuOpen} onMouseDown={(event) => event.preventDefault()} onClick={() => setIsHeadingMenuOpen((open) => !open)}><span>{blockStyle}</span><img className={isHeadingMenuOpen ? 'open' : ''} src={editorIcons.chevron} alt="" /></button>
+        {isHeadingMenuOpen && (
+          <div className="editorHeadingMenu" role="menu" aria-label="Text style">
+            <button className={blockStyle === 'Header 1' ? 'selected' : ''} type="button" role="menuitemradio" aria-checked={blockStyle === 'Header 1'} onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockStyle('Header 1')}><span>Header 1</span>{blockStyle === 'Header 1' && <img src={icons.downloadSuccess} alt="" />}</button>
+            <button className={blockStyle === 'Body' ? 'selected' : ''} type="button" role="menuitemradio" aria-checked={blockStyle === 'Body'} onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockStyle('Body')}><span>Body</span>{blockStyle === 'Body' && <img src={icons.downloadSuccess} alt="" />}</button>
+          </div>
+        )}
+      </div>
+      <div className="editorGroup editorFormattingGroup">
+        {iconButton('Bold', editorIcons.bold, 'bold', 'editorHoverPreview')}
+        {iconButton('Italic', editorIcons.italic, 'italic')}
+        {iconButton('Underline', editorIcons.underline, 'underline')}
+        <img className="editorDivider" src={editorIcons.divider} alt="" />
+        <button className="editorColor" type="button" aria-label="Text color" aria-expanded={openEditorPanel === 'color'} title="Text color" onMouseDown={(event) => event.preventDefault()} onClick={() => setOpenEditorPanel((panel) => panel === 'color' ? null : 'color')}><span /></button>
+        <img className="editorDivider" src={editorIcons.divider} alt="" />
+        <button type="button" aria-label={`Align ${nextAlignment}`} title={`Align ${nextAlignment}`} onMouseDown={(event) => event.preventDefault()} onClick={cycleAlignment}><span className={`editorAlignIcon ${nextAlignment}`} aria-hidden="true"><i /><i /><i /><i /></span></button>
+        <button className={isBulleted ? 'active' : ''} type="button" aria-label={isBulleted ? 'Remove bulleted list' : 'Bulleted list'} aria-pressed={isBulleted} title={isBulleted ? 'Remove bulleted list' : 'Bulleted list'} onMouseDown={(event) => event.preventDefault()} onClick={() => onFormat('insertUnorderedList')}><img src={editorIcons.list} alt="" /></button>
+        <img className="editorDivider" src={editorIcons.divider} alt="" />
+        <button type="button" aria-label="Add link" aria-expanded={openEditorPanel === 'link'} title="Add link" onMouseDown={(event) => event.preventDefault()} onClick={() => setOpenEditorPanel((panel) => panel === 'link' ? null : 'link')}><img src={editorIcons.link} alt="" /></button>
+        <label className="editorImageButton" title="Add image"><img src={editorIcons.image} alt="" /><input type="file" accept="image/*" onChange={(event) => { insertImage(event.target.files?.[0]); event.target.value = '' }} /></label>
+        {openEditorPanel === 'color' && <div className="editorColorMenu" aria-label="Text colors">{['#0a0a0a', '#29323d', '#0d76f2', '#f24b0d', '#810718'].map((color) => <button type="button" key={color} aria-label={`Use ${color}`} style={{ backgroundColor: color }} onMouseDown={(event) => event.preventDefault()} onClick={() => { onFormat('foreColor', color); setOpenEditorPanel(null) }} />)}</div>}
+        {openEditorPanel === 'link' && <form className="editorLinkMenu" onSubmit={(event) => { event.preventDefault(); applyLink() }}><input autoFocus value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} placeholder="https://example.com" aria-label="Link URL" /><button type="submit" disabled={!linkUrl.trim()}>Apply</button></form>}
+      </div>
+    </div>
+  )
+}
+
 function FilePreview({ file, copyFeedback, onCopyLink, onDownload, onInfo, onClose }: { file: FolderFile; copyFeedback: CopyFeedback; onCopyLink: () => void; onDownload: () => void; onInfo: () => void; onClose: () => void }) {
   const [loadState, setLoadState] = useState<'loaded' | 'loading' | 'error'>(file.previewAvailable === false ? 'error' : 'loaded')
+  const [isShareOpen, setIsShareOpen] = useState(false)
+  const [editorToolbarPosition, setEditorToolbarPosition] = useState<EditorToolbarPosition | null>(null)
+  const [editorBlockStyle, setEditorBlockStyle] = useState<'Header 1' | 'Body'>('Body')
+  const [isEditorBulleted, setIsEditorBulleted] = useState(false)
   const retryTimerRef = useRef<number | null>(null)
+  const previewDocumentRef = useRef<HTMLElement>(null)
+  const editorSelectionRef = useRef<Range | null>(null)
 
   useEffect(() => {
     setLoadState(file.previewAvailable === false ? 'error' : 'loaded')
@@ -749,10 +832,76 @@ function FilePreview({ file, copyFeedback, onCopyLink, onDownload, onInfo, onClo
     }
   }, [file])
 
+  useEffect(() => {
+    const closeEditor = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (!target.closest('.textEditorToolbar') && !target.closest('.previewDocument')) setEditorToolbarPosition(null)
+    }
+    document.addEventListener('mousedown', closeEditor)
+    return () => document.removeEventListener('mousedown', closeEditor)
+  }, [])
+
+  useEffect(() => {
+    if (!isShareOpen) return
+    const closeShare = (event: MouseEvent) => {
+      if (!(event.target as HTMLElement).closest('[data-share-control]')) setIsShareOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsShareOpen(false)
+    }
+    document.addEventListener('mousedown', closeShare)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeShare)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [isShareOpen])
+
   const retryLoading = () => {
     setLoadState('loading')
     if (retryTimerRef.current !== null) window.clearTimeout(retryTimerRef.current)
     retryTimerRef.current = window.setTimeout(() => setLoadState(file.previewAvailable === false ? 'error' : 'loaded'), 600)
+  }
+
+  const showEditorForSelection = () => {
+    const selection = window.getSelection()
+    const documentElement = previewDocumentRef.current
+    if (!selection || selection.isCollapsed || !selection.rangeCount || !documentElement || !documentElement.contains(selection.anchorNode)) {
+      setEditorToolbarPosition(null)
+      return
+    }
+    const selectionBounds = selection.getRangeAt(0).getBoundingClientRect()
+    const selectionRange = selection.getRangeAt(0)
+    editorSelectionRef.current = selectionRange.cloneRange()
+    const selectionElement = selection.anchorNode?.nodeType === Node.ELEMENT_NODE ? selection.anchorNode as Element : selection.anchorNode?.parentElement
+    setEditorBlockStyle(selectionElement?.closest('h1, h2') ? 'Header 1' : 'Body')
+    setIsEditorBulleted(Boolean(selectionElement?.closest('li')) || document.queryCommandState('insertUnorderedList'))
+    const toolbarWidth = 306
+    setEditorToolbarPosition({
+      left: Math.max(8, Math.min(window.innerWidth - toolbarWidth - 8, selectionBounds.left - 6)),
+      top: Math.min(window.innerHeight - 34, selectionBounds.bottom + 8),
+    })
+  }
+
+  const applyEditorFormat = (command: string, value?: string) => {
+    const selection = window.getSelection()
+    const savedRange = editorSelectionRef.current
+    if (!selection || !savedRange) return
+    previewDocumentRef.current?.focus({ preventScroll: true })
+    selection.removeAllRanges()
+    selection.addRange(savedRange)
+    document.execCommand(command, false, value)
+    if (command === 'formatBlock') setEditorBlockStyle(value === 'h1' ? 'Header 1' : 'Body')
+    setIsEditorBulleted(document.queryCommandState('insertUnorderedList'))
+    if (selection.rangeCount) {
+      const nextRange = selection.getRangeAt(0)
+      editorSelectionRef.current = nextRange.cloneRange()
+      const bounds = nextRange.getBoundingClientRect()
+      if (bounds.width || bounds.height) {
+        const toolbarWidth = 306
+        setEditorToolbarPosition({ left: Math.max(8, Math.min(window.innerWidth - toolbarWidth - 8, bounds.left - 6)), top: Math.min(window.innerHeight - 34, bounds.bottom + 8) })
+      }
+    }
   }
 
   return (
@@ -761,11 +910,34 @@ function FilePreview({ file, copyFeedback, onCopyLink, onDownload, onInfo, onClo
       <div className="previewCard">
         <div className="previewToolbar">
           <div className="fileMetadata">
-            <span>/{file.name}</span><Icon src={icons.metadataDivider} /><span>{file.size}</span><Icon src={icons.metadataDivider} /><span>Aug 3</span>
+            <span>{file.kind}</span><Icon src={icons.metadataDivider} /><span>{formatDisplayFileSize(file.size)}</span><Icon src={icons.metadataDivider} /><span>Aug 3</span>
           </div>
           <div className="previewActions">
             <button onClick={onInfo}><Icon src={icons.previewInfo} />Info</button>
-            <button className="copyLinkButton" onClick={onCopyLink}><Icon src={copyFeedback?.status === 'success' ? icons.copySuccess : copyFeedback?.status === 'failure' ? icons.previewClose : icons.previewCopy} />Copy-link{copyFeedback && <CopyTooltip feedback={copyFeedback} />}</button>
+            <div className="shareControl" data-share-control>
+              <button className="shareButton" type="button" aria-haspopup="dialog" aria-expanded={isShareOpen} onClick={() => setIsShareOpen((open) => !open)}><Icon src={icons.previewShare} />Share</button>
+              {isShareOpen && (
+                <section className="sharePopover" role="dialog" aria-label={`Share ${file.name}`}>
+                  <img className="sharePopoverPointer" src="/assets/share-tooltip.svg" alt="" aria-hidden="true" />
+                  <div className="sharePopoverBody">
+                    <div className="sharePeople">
+                      <div className="shareHeadingRow">
+                        <div className="shareHeading"><span>People with access on</span><img src="/assets/share-document.svg" alt="" aria-hidden="true" /><span>{file.name}</span></div>
+                        <div className="sharePeopleCount" aria-label="1 person has access"><img src="/assets/share-people.svg" alt="" aria-hidden="true" /><span>1</span></div>
+                      </div>
+                      <div className="shareMemberRow">
+                        <div className="shareMember"><img className="shareAvatar" src="/assets/james-avatar.png" alt="" /><span>James T.</span><span className="shareBadge">Member</span></div>
+                        <button type="button" disabled>Remove</button>
+                      </div>
+                    </div>
+                    <div className="shareFooter">
+                      <button className="sharePermission" type="button">All people with access can edit<img src="/assets/share-extra-1.svg" alt="" /></button>
+                      <button className="shareCopyLink" type="button" onClick={onCopyLink}><img src={copyFeedback?.status === 'success' ? icons.downloadSuccess : copyFeedback?.status === 'failure' ? icons.previewClose : '/assets/share-chevron.svg'} alt="" />{copyFeedback?.status === 'success' ? 'Link-copied' : copyFeedback?.status === 'failure' ? 'Copy failed' : 'Copy-link'}</button>
+                    </div>
+                  </div>
+                </section>
+              )}
+            </div>
             <button onClick={onDownload}><Icon src={icons.previewDownload} />Download</button>
           </div>
         </div>
@@ -774,7 +946,7 @@ function FilePreview({ file, copyFeedback, onCopyLink, onDownload, onInfo, onClo
             <strong>{loadState === 'loading' ? 'Loading file…' : 'Couldn’t load this file'}</strong>
             {loadState === 'error' && <button type="button" onClick={retryLoading}><Icon src={icons.previewRetry} />Try again</button>}
           </div>
-        ) : <article className="previewDocument">
+        ) : <article className="previewDocument" ref={previewDocumentRef} contentEditable suppressContentEditableWarning onMouseUp={showEditorForSelection} onKeyUp={showEditorForSelection} onContextMenu={(event) => { if (editorToolbarPosition) event.preventDefault() }}>
           <h2>{file.name}</h2>
           <p><strong>Your Folder is ready to go the moment you sign up.</strong><br />It ships with three things: `folder.md` as the root operating file, a set of reusable prompt files for common agent tasks, and a live API key created during signup.</p>
           <p><strong>The core idea</strong><br />Everything lives in one place, and `folder.md` is the entry point. Whenever an agent starts a task, it reads `folder.md` first — that&apos;s how it learns the context, the conventions, and where things belong.</p>
@@ -783,6 +955,7 @@ function FilePreview({ file, copyFeedback, onCopyLink, onDownload, onInfo, onClo
           <p><strong>Handing off to an agent — what to say</strong><br />&gt; Use my Folder as the working space for this task. Read `folder.md` first, keep the file structure tidy, and explain what you saved when you&apos;re done.<br />That&apos;s it. The agent takes it from there.</p>
         </article>}
       </div>
+      {editorToolbarPosition && <TextEditorToolbar position={editorToolbarPosition} blockStyle={editorBlockStyle} isBulleted={isEditorBulleted} onFormat={applyEditorFormat} />}
     </aside>
   )
 }
@@ -827,7 +1000,7 @@ export default function App() {
   const [isSearching, setIsSearching] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchFilter, setSearchFilter] = useState<'all' | FileKind>('all')
-  const [currentView, setCurrentView] = useState<'home' | 'folder'>('home')
+  const [currentView, setCurrentView] = useState<'home' | 'folder' | 'apiKeys'>('home')
   const [selectedFolderName, setSelectedFolderName] = useState('Folder 001')
   const [folderToRename, setFolderToRename] = useState<string | null>(null)
   const [folderToDelete, setFolderToDelete] = useState<string | null>(null)
@@ -909,9 +1082,11 @@ export default function App() {
         onSearchChange={updateSearchQuery}
         onOpenFolder={openFolder}
         onCreateFolder={createFolder}
+        isApiKeysActive={currentView === 'apiKeys'}
+        onOpenApiKeys={() => { setCurrentView('apiKeys'); setSearchQuery(''); setIsSearching(false) }}
       />
       <section className="content">
-        {currentView === 'folder' && !isSearching ? <FolderDetail key={selectedFolderName} folderName={selectedFolderName} initialItems={folderContents[selectedFolderName] ?? []} onItemsChange={(items) => {
+        {currentView === 'apiKeys' && !isSearching ? <ApiKeysPage /> : currentView === 'folder' && !isSearching ? <FolderDetail key={selectedFolderName} folderName={selectedFolderName} initialItems={folderContents[selectedFolderName] ?? []} onItemsChange={(items) => {
           setFolderContents((current) => ({ ...current, [selectedFolderName]: items }))
           setFolderRows((current) => current.map((folder) => folder.name === selectedFolderName ? { ...folder, count: items.length } : folder))
           setHomeFiles((current) => current.map((file) => file.name === selectedFolderName ? { ...file, size: formatFileSize(items.reduce((total, item) => total + fileSizeInBytes(item.size), 0)), modified: 'Just now' } : file))
