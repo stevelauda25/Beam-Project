@@ -1,0 +1,273 @@
+import { useEffect, useRef, useState } from 'react'
+
+type SettingsPageProps = {
+  onOpenApiKeys: () => void
+  onWorkspaceNameChange: (name: string) => void
+  onDirtyChange: (dirty: boolean) => void
+  onSaveSuccess: (changeCount: number) => void
+  leaveRequest: number
+  onLeaveResolved: (proceed: boolean) => void
+}
+type SavedSettings = { workspaceName: string; timezone: string; defaultView: string; trashRetention: string; confirmDelete: boolean; linkPermission: string; linkExpiry: string; externalSharing: boolean; securityAlerts: boolean }
+
+const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+const defaults: SavedSettings = { workspaceName: 'Personal', timezone: detectedTimezone, defaultView: 'List', trashRetention: '30 days', confirmDelete: true, linkPermission: 'View only', linkExpiry: '7 days', externalSharing: false, securityAlerts: true }
+const readSettings = (): SavedSettings => {
+  try { return { ...defaults, ...JSON.parse(window.localStorage.getItem('beam-settings-v2') ?? '{}') } }
+  catch { return defaults }
+}
+
+const icons = {
+  user: '/assets/settings-edit.svg', edit: '/assets/settings-chevron.svg', clock: '/assets/settings-clock.svg', chevron: '/assets/settings-user.svg',
+  list: '/assets/settings-info.svg', info: '/assets/settings-check.svg', check: '/assets/settings-list.svg', x: '/assets/settings-x.svg',
+  plus: '/assets/settings-plus.svg', monitor: '/assets/settings-monitor.svg', trash: '/assets/settings-trash.svg',
+  review: '/assets/settings-review.svg',
+  reviewClose: '/assets/settings-review-close.svg', reviewArrow: '/assets/settings-review-undo.svg', reviewUndo: '/assets/settings-review-save.svg', reviewSave: '/assets/settings-review-arrow.svg',
+  toggleActive: '/assets/settings-toggle-active.svg', toggleInactive: '/assets/settings-toggle-inactive.svg',
+} as const
+
+const sections = [['general', 'General'], ['files-storage', 'Files and storage'], ['sharing-access', 'Sharing and access'], ['security', 'Security'], ['workspace-data', 'Workspace data'], ['danger-zone', 'Danger zone']] as const
+
+function Icon({ src }: { src: string }) { return <img className="settingsIcon" src={src} alt="" aria-hidden="true" /> }
+
+function Toggle({ checked, onChange, label, saving = false }: { checked: boolean; onChange: (value: boolean) => void; label: string; saving?: boolean }) {
+  return <label className={`settingsToggle${checked ? ' checked' : ''}${saving ? ' saving' : ''}`}><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} aria-busy={saving} /><span className="settingsToggleHit"><span className="settingsToggleTrack"><span className="settingsToggleThumb"><img src={checked ? icons.toggleActive : icons.toggleInactive} alt="" aria-hidden="true" /></span></span></span><span className="srOnly">{label}</span></label>
+}
+
+function SelectControl({ value, options, icon, label, onChange }: { value: string; options: string[]; icon?: string; label: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [focusedIndex, setFocusedIndex] = useState(() => Math.max(0, options.indexOf(value)))
+  const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const typeBuffer = useRef('')
+  const typeTimer = useRef<number | undefined>(undefined)
+
+  useEffect(() => {
+    if (!open) return
+    const closeOutside = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) { setOpen(false); triggerRef.current?.focus() } }
+    document.addEventListener('mousedown', closeOutside)
+    return () => document.removeEventListener('mousedown', closeOutside)
+  }, [open])
+
+  useEffect(() => { if (open) optionRefs.current[focusedIndex]?.focus() }, [focusedIndex, open])
+
+  const choose = (option: string) => { onChange(option); setOpen(false); requestAnimationFrame(() => triggerRef.current?.focus()) }
+  const openAt = (index: number) => { setFocusedIndex(index); setOpen(true) }
+  const handleTriggerKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault(); openAt(event.key === 'ArrowUp' ? options.length - 1 : Math.max(0, options.indexOf(value)))
+    }
+  }
+  const handleOptionKeyDown = (event: React.KeyboardEvent, index: number) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setFocusedIndex((index + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length) }
+    else if (event.key === 'Home' || event.key === 'End') { event.preventDefault(); setFocusedIndex(event.key === 'Home' ? 0 : options.length - 1) }
+    else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(options[index]) }
+    else if (event.key === 'Escape' || event.key === 'Tab') { setOpen(false); if (event.key === 'Escape') { event.preventDefault(); triggerRef.current?.focus() } }
+    else if (event.key.length === 1 && /\S/.test(event.key)) {
+      typeBuffer.current += event.key.toLowerCase(); window.clearTimeout(typeTimer.current)
+      const match = options.findIndex((option) => option.toLowerCase().startsWith(typeBuffer.current))
+      if (match >= 0) setFocusedIndex(match)
+      typeTimer.current = window.setTimeout(() => { typeBuffer.current = '' }, 500)
+    }
+  }
+
+  return <div className={`settingsSelect${open ? ' open' : ''}`} ref={rootRef}>
+    <button ref={triggerRef} className="settingsSelectTrigger" type="button" aria-label={`${label}: ${value}`} aria-haspopup="listbox" aria-expanded={open} onClick={() => open ? setOpen(false) : openAt(Math.max(0, options.indexOf(value)))} onKeyDown={handleTriggerKeyDown}>
+      {icon && <Icon src={icon} />}<span>{value}</span><Icon src={icons.chevron} />
+    </button>
+    {open && <div className="settingsSelectMenu" role="listbox" aria-label={label}>{options.map((option, index) => <button ref={(node) => { optionRefs.current[index] = node }} className={`${option === value ? 'selected ' : ''}${index === focusedIndex ? 'focused' : ''}`} type="button" role="option" aria-selected={option === value} tabIndex={index === focusedIndex ? 0 : -1} key={option} onMouseEnter={() => setFocusedIndex(index)} onKeyDown={(event) => handleOptionKeyDown(event, index)} onClick={() => choose(option)}><span>{option}</span>{option === value && <Icon src={icons.check} />}</button>)}</div>}
+  </div>
+}
+
+function Row({ label, children, infoText, description }: { label: string; children: React.ReactNode; infoText?: string; description?: string }) {
+  const tooltipId = `settings-tip-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+  return <div className={`settingsRow${description ? ' described' : ''}`}><div className="settingsRowLabel"><span>{label}</span>{infoText && <span className="settingsInfoTooltip"><button type="button" aria-label={`About ${label}`} aria-describedby={tooltipId}><Icon src={icons.info} /></button><span id={tooltipId} role="tooltip">{infoText}</span></span>}{description && <small>{description}</small>}</div><div className="settingsRowControl">{children}</div></div>
+}
+
+const settingLabels: Record<keyof SavedSettings, string> = {
+  workspaceName: 'Workspace name', timezone: 'Time zone', defaultView: 'Default view', trashRetention: 'Trash retention', confirmDelete: 'Confirm permanent deletion',
+  linkPermission: 'Default permission', linkExpiry: 'Default link expiry', externalSharing: 'External sharing', securityAlerts: 'Security alerts',
+}
+
+const displaySettingValue = (value: string | boolean) => typeof value === 'boolean' ? (value ? 'On' : 'Off') : value
+
+export default function SettingsPage({ onOpenApiKeys, onWorkspaceNameChange, onDirtyChange, onSaveSuccess, leaveRequest, onLeaveResolved }: SettingsPageProps) {
+  const [initial] = useState(readSettings)
+  const [savedSettings, setSavedSettings] = useState(initial)
+  const [workspaceName, setWorkspaceName] = useState(initial.workspaceName)
+  const [workspaceNameDraft, setWorkspaceNameDraft] = useState(initial.workspaceName)
+  const [isEditingWorkspaceName, setIsEditingWorkspaceName] = useState(false)
+  const [workspaceNameError, setWorkspaceNameError] = useState('')
+  const workspaceNameInputRef = useRef<HTMLInputElement>(null)
+  const workspaceImportRef = useRef<HTMLInputElement>(null)
+  const [timezone, setTimezone] = useState(initial.timezone)
+  const [defaultView, setDefaultView] = useState(initial.defaultView)
+  const [trashRetention, setTrashRetention] = useState(initial.trashRetention)
+  const [confirmDelete, setConfirmDelete] = useState(initial.confirmDelete)
+  const [linkPermission, setLinkPermission] = useState(initial.linkPermission)
+  const [linkExpiry, setLinkExpiry] = useState(initial.linkExpiry)
+  const [externalSharing, setExternalSharing] = useState(initial.externalSharing)
+  const [securityAlerts, setSecurityAlerts] = useState(initial.securityAlerts)
+  const [activeSection, setActiveSection] = useState('general')
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const [utilityDialog, setUtilityDialog] = useState<'sessions' | null>(null)
+  const [isReviewOpen, setIsReviewOpen] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [importError, setImportError] = useState('')
+
+  const currentSettings: SavedSettings = { workspaceName, timezone, defaultView, trashRetention, confirmDelete, linkPermission, linkExpiry, externalSharing, securityAlerts }
+  const changes = (Object.keys(settingLabels) as Array<keyof SavedSettings>).filter((key) => currentSettings[key] !== savedSettings[key]).map((key) => ({ key, label: settingLabels[key], before: displaySettingValue(savedSettings[key]), after: displaySettingValue(currentSettings[key]) }))
+  const isDirty = changes.length > 0
+  const timezoneOptions = Array.from(new Set([detectedTimezone, 'Asia/Makassar', 'Asia/Jakarta', 'Asia/Jayapura', 'Europe/London', 'UTC']))
+
+  useEffect(() => onDirtyChange(isDirty), [isDirty, onDirtyChange])
+
+  useEffect(() => {
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => { if (isDirty) event.preventDefault() }
+    window.addEventListener('beforeunload', warnBeforeUnload)
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload)
+  }, [isDirty])
+
+  useEffect(() => { if (leaveRequest > 0 && isDirty) setIsReviewOpen(true) }, [leaveRequest, isDirty])
+
+  useEffect(() => {
+    if (!isEditingWorkspaceName) return
+    workspaceNameInputRef.current?.focus()
+    workspaceNameInputRef.current?.select()
+  }, [isEditingWorkspaceName])
+
+  const startWorkspaceNameEdit = () => {
+    setWorkspaceNameDraft(workspaceName)
+    setWorkspaceNameError('')
+    setIsEditingWorkspaceName(true)
+  }
+
+  const cancelWorkspaceNameEdit = () => {
+    setWorkspaceNameDraft(workspaceName)
+    setWorkspaceNameError('')
+    setIsEditingWorkspaceName(false)
+  }
+
+  const saveWorkspaceName = () => {
+    const nextName = workspaceNameDraft.trim()
+    if (!nextName) { setWorkspaceNameError('Workspace name is required'); workspaceNameInputRef.current?.focus(); return }
+    setWorkspaceName(nextName)
+    setWorkspaceNameDraft(nextName)
+    setWorkspaceNameError('')
+    setIsEditingWorkspaceName(false)
+  }
+
+  const applySettings = (settings: SavedSettings) => {
+    setWorkspaceName(settings.workspaceName); setWorkspaceNameDraft(settings.workspaceName); setTimezone(settings.timezone); setDefaultView(settings.defaultView); setTrashRetention(settings.trashRetention)
+    setConfirmDelete(settings.confirmDelete); setLinkPermission(settings.linkPermission); setLinkExpiry(settings.linkExpiry); setExternalSharing(settings.externalSharing); setSecurityAlerts(settings.securityAlerts)
+    setIsEditingWorkspaceName(false); setWorkspaceNameError('')
+  }
+
+  const saveAllChanges = () => {
+    try {
+      window.localStorage.setItem('beam-settings-v2', JSON.stringify(currentSettings))
+      const savedChangeCount = changes.length
+      setSavedSettings(currentSettings)
+      onWorkspaceNameChange(currentSettings.workspaceName)
+      onSaveSuccess(savedChangeCount)
+      setSaveError(''); setIsReviewOpen(false); onLeaveResolved(true)
+    } catch { setSaveError('Couldn’t save these changes. Please try again.') }
+  }
+
+  const undoAllChanges = () => {
+    applySettings(savedSettings)
+    setSaveError(''); setIsReviewOpen(false); onLeaveResolved(true)
+  }
+
+  const cancelReview = () => { setSaveError(''); setIsReviewOpen(false); onLeaveResolved(false) }
+
+  const exportWorkspaceData = () => {
+    const payload = { format: 'beam-workspace', version: 1, workspace: savedSettings.workspaceName, exportedAt: new Date().toISOString(), settings: savedSettings, files: { storageUsedMb: 1276, storageCapacityMb: 5120 } }
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }))
+    const link = document.createElement('a'); link.href = url; link.download = `${savedSettings.workspaceName.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'workspace'}-export.json`; link.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
+
+  const importWorkspaceData = async (file: File) => {
+    try {
+      const payload = JSON.parse(await file.text()) as { format?: string; version?: number; settings?: Partial<SavedSettings> }
+      if (payload.format !== 'beam-workspace' || payload.version !== 1 || !payload.settings || typeof payload.settings !== 'object') throw new Error('Invalid export')
+      const imported = { ...currentSettings }
+      for (const key of Object.keys(defaults) as Array<keyof SavedSettings>) {
+        const value = payload.settings[key]
+        if (value !== undefined) {
+          if (typeof value !== typeof defaults[key]) throw new Error('Invalid setting type')
+          ;(imported as Record<keyof SavedSettings, string | boolean>)[key] = value
+        }
+      }
+      if (!(Object.keys(defaults) as Array<keyof SavedSettings>).some((key) => imported[key] !== savedSettings[key])) {
+        setImportError('This export already matches your saved workspace settings.')
+        if (workspaceImportRef.current) workspaceImportRef.current.value = ''
+        return
+      }
+      applySettings(imported)
+      setImportError('')
+      window.setTimeout(() => setIsReviewOpen(true), 0)
+    } catch { setImportError('This file is not a valid Beam workspace export.') }
+    if (workspaceImportRef.current) workspaceImportRef.current.value = ''
+  }
+
+  const openSection = (id: string) => {
+    setActiveSection(id)
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  return (
+    <main className="settingsPage" aria-labelledby="settings-title" data-page="settings">
+      <header className="settingsPageHeader"><h1 id="settings-title">Settings</h1></header>
+      <div className="settingsLayout">
+        <nav className="settingsNav" aria-label="Settings sections">{sections.map(([id, label]) => <button className={activeSection === id ? 'active' : ''} type="button" key={id} onClick={() => openSection(id)}>{label}</button>)}</nav>
+        <label className="settingsMobileNav"><span className="srOnly">Settings section</span><select value={activeSection} onChange={(event) => openSection(event.target.value)}>{sections.map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select><Icon src={icons.chevron} /></label>
+        <div className="settingsContent">
+          <section className="settingsGroup" id="general"><header><h2>General</h2></header>
+            <Row label="Workspace name"><div className={`workspaceNameControl${isEditingWorkspaceName ? ' editing' : ''}`}><Icon src={icons.user} />{isEditingWorkspaceName ? <input ref={workspaceNameInputRef} aria-label="Workspace name" aria-invalid={Boolean(workspaceNameError)} value={workspaceNameDraft} maxLength={64} onChange={(event) => { setWorkspaceNameDraft(event.target.value); setWorkspaceNameError('') }} onKeyDown={(event) => { if (event.key === 'Enter') saveWorkspaceName(); else if (event.key === 'Escape') cancelWorkspaceNameEdit() }} /> : <span className="workspaceNameValue">{workspaceName}</span>}<button type="button" aria-label={isEditingWorkspaceName ? 'Save workspace name' : 'Edit workspace name'} title={isEditingWorkspaceName ? 'Save' : 'Edit'} onClick={isEditingWorkspaceName ? saveWorkspaceName : startWorkspaceNameEdit}><Icon src={isEditingWorkspaceName ? icons.check : icons.edit} /></button>{workspaceNameError && <span className="workspaceNameError" role="alert">{workspaceNameError}</span>}</div></Row>
+            <Row label="Time zone"><SelectControl label="Time zone" value={timezone} options={timezoneOptions} icon={icons.clock} onChange={setTimezone} /></Row>
+          </section>
+
+          <section className="settingsGroup" id="files-storage"><header><h2>Files and storage</h2></header>
+            <div className="settingsStorage"><div><span>Storage used</span><span>1,276 MB <em>of 5,120 MB</em></span></div><div className="settingsStorageTrack"><span /></div></div>
+            <Row label="Default view"><SelectControl label="Default view" value={defaultView} options={['List', 'Grid']} icon={icons.list} onChange={setDefaultView} /></Row>
+            <Row label="Trash retention"><SelectControl label="Trash retention" value={trashRetention} options={['7 days', '30 days', '90 days']} onChange={setTrashRetention} /></Row>
+            <Row label="Confirm permanent deletion" infoText="Ask for confirmation before a file is permanently deleted."><Toggle label="Confirm permanent deletion" checked={confirmDelete} onChange={setConfirmDelete} /></Row>
+          </section>
+
+          <section className="settingsGroup" id="sharing-access"><header><h2>Sharing and access</h2></header>
+            <Row label="Default permission"><SelectControl label="Default permission" value={linkPermission} options={['View only', 'Can download', 'Can edit']} onChange={setLinkPermission} /></Row>
+            <Row label="Default link expiry"><SelectControl label="Default link expiry" value={linkExpiry} options={['1 day', '7 days', '30 days', 'No expiry']} onChange={setLinkExpiry} /></Row>
+            <Row label="External sharing" infoText="Allow files to be shared with people outside this workspace."><Toggle label="External sharing" checked={externalSharing} onChange={setExternalSharing} /></Row>
+          </section>
+
+          <section className="settingsGroup" id="security"><header><h2>Security</h2></header>
+            <Row label="Security alerts" infoText="Security alerts are delivered to the email address on your Beam account."><Toggle label="Security alerts" checked={securityAlerts} onChange={setSecurityAlerts} /></Row>
+            <Row label="Alert destination"><span className="settingsStaticValue">michele@example.com</span></Row>
+            <Row label="Active sessions"><button className="settingsInlineAction" type="button" onClick={() => setUtilityDialog('sessions')}><Icon src={icons.monitor} />Manage sessions</button></Row>
+            <Row label="Two-factor authentication"><button className="settingsInlineAction" type="button"><Icon src={icons.plus} />Set up</button></Row>
+            <Row label="API keys"><button className="settingsInlineAction" type="button" onClick={onOpenApiKeys}><Icon src={icons.monitor} />Manage API Keys</button></Row>
+          </section>
+
+          <section className="settingsGroup" id="workspace-data"><header><h2>Workspace data</h2></header>
+            <Row label="Workspace data" description="Import or export your workspace settings and metadata."><div className="settingsDataActions"><button type="button" onClick={() => workspaceImportRef.current?.click()}>Import data</button><button type="button" onClick={exportWorkspaceData}>Export data</button><input ref={workspaceImportRef} className="srOnly" type="file" accept="application/json,.json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importWorkspaceData(file) }} /></div></Row>
+            {importError && <div className="settingsDataError" role="alert">{importError}</div>}
+          </section>
+
+          <section className="settingsGroup danger" id="danger-zone"><header><h2>Danger zone</h2></header>
+            <Row label="Delete workspace" description="Permanently delete this workspace and all of its files."><button className="settingsDangerButton" type="button" onClick={() => setIsDeleteOpen(true)}><Icon src={icons.trash} />Delete workspace</button></Row>
+          </section>
+        </div>
+      </div>
+
+      {isDirty && <div className="settingsUnsavedBar" role="status"><span>{changes.length} unsaved {changes.length === 1 ? 'change' : 'changes'}</span><button type="button" onClick={() => setIsReviewOpen(true)}><Icon src={icons.review} /><span>Review changes</span></button></div>}
+
+      {isReviewOpen && <div className="newFolderBackdrop settingsReviewBackdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) cancelReview() }}><section className="settingsReviewModal" role="dialog" aria-modal="true" aria-labelledby="settings-review-title"><header><div><h2 id="settings-review-title">Review changes</h2><p>You have made changes to these settings.</p></div><button type="button" aria-label="Close review changes" onClick={cancelReview}><Icon src={icons.reviewClose} /></button></header><ul>{changes.map((change) => <li key={change.key}><span>{change.label}</span><div><del>{change.before}</del><Icon src={icons.reviewArrow} /><strong>{change.after}</strong></div></li>)}</ul>{saveError && <p className="settingsReviewError" role="alert">{saveError}</p>}<footer><button type="button" onClick={undoAllChanges}><Icon src={icons.reviewUndo} />Undo changes</button><button className="settingsReviewSave" type="button" onClick={saveAllChanges}><Icon src={icons.reviewSave} />Save changes</button></footer></section></div>}
+
+      {isDeleteOpen && <div className="newFolderBackdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsDeleteOpen(false) }}><section className="newFolderModal settingsDeleteModal" role="alertdialog" aria-modal="true" aria-labelledby="delete-workspace-title"><header><h2 id="delete-workspace-title">Delete workspace</h2><button type="button" aria-label="Close delete workspace dialog" onClick={() => setIsDeleteOpen(false)}><Icon src={icons.reviewClose} /></button></header><div><p>Workspace deletion requires backend account verification and is not enabled yet.</p><button type="button" onClick={() => setIsDeleteOpen(false)}>Understood</button></div></section></div>}
+      {utilityDialog && <div className="newFolderBackdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setUtilityDialog(null) }}><section className="newFolderModal settingsUtilityModal" role="dialog" aria-modal="true" aria-labelledby="settings-utility-title"><header><h2 id="settings-utility-title">Active sessions</h2><button type="button" aria-label="Close active sessions dialog" onClick={() => setUtilityDialog(null)}><Icon src={icons.reviewClose} /></button></header><div className="settingsUtilityContent"><div><span>Current session</span><strong>This browser</strong></div><p>Other-device session management will be available after account authentication is connected.</p></div></section></div>}
+    </main>
+  )
+}

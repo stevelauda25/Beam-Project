@@ -26,7 +26,7 @@ const apiIcons = {
   hide: '/assets/api-hide.svg',
   bannerShow: '/assets/api-banner-show.svg',
   bannerCopy: '/assets/api-banner-copy.svg',
-  close: '/assets/preview-close.svg',
+  close: '/assets/file-activity-close.svg',
 } as const
 
 const maskKey = (key: Pick<ApiKey, 'prefix' | 'lastFour'>) => `${key.prefix}••••••••${key.lastFour}`
@@ -376,7 +376,7 @@ export default function ApiKeysPage() {
       {keyToRevoke && (
         <div className="newFolderBackdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !isRevoking) { setKeyToRevoke(null); setRevokeError(null) } }}>
           <section className="newFolderModal apiRevokeModal" role="alertdialog" aria-modal="true" aria-labelledby="revoke-api-key-title" aria-describedby="revoke-api-key-description">
-            <header><h2 id="revoke-api-key-title">Revoke API key</h2><button type="button" disabled={isRevoking} onClick={() => { setKeyToRevoke(null); setRevokeError(null) }}><img src={apiIcons.close} alt="" />Close</button></header>
+            <header><h2 id="revoke-api-key-title">Revoke API key</h2><button type="button" aria-label="Close revoke API key dialog" disabled={isRevoking} onClick={() => { setKeyToRevoke(null); setRevokeError(null) }}><img src={apiIcons.close} alt="" /></button></header>
             <div className="apiRevokeContent">
               <div><strong>Revoke “{keyToRevoke.name}”?</strong><p id="revoke-api-key-description">All apps, scripts, or agents connected with this key will stop working immediately. You’ll need to create a new key and update each integration.</p></div>
               {revokeError && <p className="apiRevokeError" role="alert">{revokeError}</p>}

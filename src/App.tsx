@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import ApiKeysPage from './components/ApiKeysPage'
+import SettingsPage from './components/SettingsPage'
 
 const icons = {
   personal: '/assets/personal.svg',
@@ -10,6 +11,8 @@ const icons = {
   searchClear: '/assets/search-clear.svg',
   shortcut: '/assets/shortcut.svg',
   folder: '/assets/folder.svg',
+  folderCreate: '/assets/folder-create.svg',
+  folderCreateEnter: '/assets/folder-create-enter.svg',
   key: '/assets/key.svg',
   settings: '/assets/settings.svg',
   more: '/assets/more.svg',
@@ -39,12 +42,15 @@ const icons = {
   paneHandle: '/assets/pane-handle.svg',
   metadataDivider: '/assets/metadata-divider.svg',
   dropFolder: '/assets/drop-folder.svg',
+  fileActivityInfo: '/assets/file-activity-info.svg',
+  fileActivityClose: '/assets/file-activity-close.svg',
   avatar: '/assets/avatar.png',
 } as const
 
 type Folder = { name: string; count: number; active?: boolean }
 type FileKind = 'folder' | 'file'
 type FileRow = { name: string; size: string; modified: string; badge?: string; kind: FileKind }
+type AppView = 'home' | 'folder' | 'apiKeys' | 'settings'
 
 const folders: Folder[] = [
   { name: 'Folder 001', count: 4, active: true },
@@ -94,6 +100,7 @@ function Icon({ src }: { src: string }) {
 }
 
 type SidebarProps = {
+  workspaceName: string
   folders: Folder[]
   activeFolderName: string
   isCollapsed: boolean
@@ -106,13 +113,38 @@ type SidebarProps = {
   onCreateFolder: (name: string) => void
   isApiKeysActive: boolean
   onOpenApiKeys: () => void
+  isSettingsActive: boolean
+  onOpenSettings: () => void
 }
 
-function Sidebar({ folders: sidebarFolders, activeFolderName, isCollapsed, isSearching, searchQuery, onToggle, onStartSearch, onSearchChange, onOpenFolder, onCreateFolder, isApiKeysActive, onOpenApiKeys }: SidebarProps) {
+function Sidebar({ workspaceName, folders: sidebarFolders, activeFolderName, isCollapsed, isSearching, searchQuery, onToggle, onStartSearch, onSearchChange, onOpenFolder, onCreateFolder, isApiKeysActive, onOpenApiKeys, isSettingsActive, onOpenSettings }: SidebarProps) {
   const [isOrgMenuOpen, setIsOrgMenuOpen] = useState(false)
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
+  const [folderCreateError, setFolderCreateError] = useState('')
+  const [folderCreateSuccess, setFolderCreateSuccess] = useState('')
+  const newFolderInputRef = useRef<HTMLInputElement>(null)
+  const folderSuccessTimer = useRef<number | null>(null)
   const [activeOrganization, setActiveOrganization] = useState('Personal')
   const selectedOrganization = organizations.find((organization) => organization.name === activeOrganization) ?? organizations[0]
+
+  useEffect(() => {
+    if (isNewFolderOpen) newFolderInputRef.current?.focus()
+  }, [isNewFolderOpen])
+
+  useEffect(() => () => { if (folderSuccessTimer.current !== null) window.clearTimeout(folderSuccessTimer.current) }, [])
+
+  const closeFolderEntry = () => { setIsNewFolderOpen(false); setNewFolderName(''); setFolderCreateError('') }
+  const submitNewFolder = () => {
+    const name = newFolderName.trim()
+    if (!name) { setFolderCreateError('Enter a folder name'); return }
+    if (sidebarFolders.some((folder) => folder.name.toLowerCase() === name.toLowerCase())) { setFolderCreateError('A folder with this name already exists'); return }
+    onCreateFolder(name)
+    closeFolderEntry()
+    setFolderCreateSuccess(name)
+    if (folderSuccessTimer.current !== null) window.clearTimeout(folderSuccessTimer.current)
+    folderSuccessTimer.current = window.setTimeout(() => setFolderCreateSuccess(''), 3000)
+  }
 
   useEffect(() => {
     if (!isOrgMenuOpen) return
@@ -138,7 +170,7 @@ function Sidebar({ folders: sidebarFolders, activeFolderName, isCollapsed, isSea
             <div className="organizationControl" data-org-menu>
               <button className="workspaceName" onClick={() => setIsOrgMenuOpen((open) => !open)} aria-haspopup="menu" aria-expanded={isOrgMenuOpen}>
                 {selectedOrganization.personal ? <Icon src={icons.personal} /> : <span className="organizationAvatar"><Icon src={selectedOrganization.icon} /></span>}
-                <span>{selectedOrganization.name}</span>
+                <span>{selectedOrganization.personal ? workspaceName : selectedOrganization.name}</span>
                 <span className={`organizationChevron${isOrgMenuOpen ? ' open' : ''}`}><Icon src={icons.chevron} /></span>
               </button>
               {isOrgMenuOpen && (
@@ -156,7 +188,7 @@ function Sidebar({ folders: sidebarFolders, activeFolderName, isCollapsed, isSea
                           onClick={() => { setActiveOrganization(organization.name); setIsOrgMenuOpen(false) }}
                         >
                           {organization.personal ? <img className="avatar" src={icons.avatar} alt="" /> : <span className="organizationAvatar"><Icon src={organization.icon} /></span>}
-                          <span>{organization.name}</span>
+                          <span>{organization.personal ? workspaceName : organization.name}</span>
                           {isActive && <Icon src={icons.orgCheck} />}
                         </button>
                       )
@@ -190,14 +222,15 @@ function Sidebar({ folders: sidebarFolders, activeFolderName, isCollapsed, isSea
                 <button type="button" className="clearSearch" aria-label="Clear search" onClick={() => onSearchChange('')}><Icon src={icons.searchClear} /></button>
               ) : <Icon src={icons.shortcut} />}
             </label>
-          <button className="plainButton" aria-label="New folder" title={isCollapsed ? 'New folder' : undefined} onClick={() => setIsNewFolderOpen(true)}>
+          <button className="plainButton" aria-label="New folder" title={isCollapsed ? 'New folder' : undefined} disabled={isNewFolderOpen} onClick={() => { if (isCollapsed) onStartSearch(); setIsNewFolderOpen(true) }}>
             <Icon src={icons.folder} /><span className="sidebarLabel">New folder</span>
           </button>
         </div>
 
           <nav className={`folderList${isCollapsed || isSearching ? ' concealed' : ''}`} aria-label="Folders" aria-hidden={isCollapsed || isSearching}>
+            {isNewFolderOpen && <div className={`folderCreateRow${folderCreateError ? ' invalid' : ''}`}><Icon src={icons.folderCreate} /><input ref={newFolderInputRef} value={newFolderName} maxLength={64} aria-label="Folder name" aria-invalid={Boolean(folderCreateError)} aria-describedby={folderCreateError ? 'folder-create-error' : undefined} onChange={(event) => { setNewFolderName(event.target.value); setFolderCreateError('') }} onKeyDown={(event) => { if (event.key === 'Enter') submitNewFolder(); else if (event.key === 'Escape') closeFolderEntry() }} /><button type="button" aria-label="Create folder" onClick={submitNewFolder}><Icon src={icons.folderCreateEnter} /></button>{folderCreateError && <span id="folder-create-error" role="alert">{folderCreateError}</span>}</div>}
             {sidebarFolders.map((folder) => (
-              <button className={`folderRow${!isApiKeysActive && folder.name === activeFolderName ? ' active' : ''}`} key={folder.name} tabIndex={isCollapsed || isSearching ? -1 : 0} onClick={() => onOpenFolder(folder.name)}>
+              <button className={`folderRow${!isApiKeysActive && !isSettingsActive && folder.name === activeFolderName ? ' active' : ''}`} key={folder.name} tabIndex={isCollapsed || isSearching ? -1 : 0} onClick={() => onOpenFolder(folder.name)}>
                 <span>{folder.name}</span><span>{folder.count}</span>
               </button>
             ))}
@@ -207,7 +240,7 @@ function Sidebar({ folders: sidebarFolders, activeFolderName, isCollapsed, isSea
       <div className="sidebarBottom">
         <div className="utilityLinks">
           <button className={`plainButton${isApiKeysActive ? ' active' : ''}`} aria-label="API Keys" title={isCollapsed ? 'API Keys' : undefined} onClick={onOpenApiKeys}><Icon src={icons.key} /><span className="sidebarLabel">API Keys</span></button>
-          <button className="plainButton" aria-label="Settings" title={isCollapsed ? 'Settings' : undefined}><Icon src={icons.settings} /><span className="sidebarLabel">Settings</span></button>
+          <button className={`plainButton${isSettingsActive ? ' active' : ''}`} aria-label="Settings" title={isCollapsed ? 'Settings' : undefined} onClick={onOpenSettings}><Icon src={icons.settings} /><span className="sidebarLabel">Settings</span></button>
         </div>
         <button className="accountRow" aria-label="Michele J. account" title={isCollapsed ? 'Michele J.' : undefined}>
           <img className="avatar" src={icons.avatar} alt="Michele J." />
@@ -216,15 +249,7 @@ function Sidebar({ folders: sidebarFolders, activeFolderName, isCollapsed, isSea
         </button>
       </div>
     </aside>
-    {isNewFolderOpen && (
-      <NewFolderModal
-        onClose={() => setIsNewFolderOpen(false)}
-        onCreate={(name) => {
-          onCreateFolder(name)
-          setIsNewFolderOpen(false)
-        }}
-      />
-    )}
+    {folderCreateSuccess && <div className="apiCreatedToast" role="status" aria-live="polite"><span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span><div><strong>Folder created</strong><span>{folderCreateSuccess} was created successfully.</span></div></div>}
     </>
   )
 }
@@ -249,7 +274,7 @@ function NewFolderModal({ onCreate, onClose }: { onCreate: (name: string) => voi
   return (
     <div className="newFolderBackdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <section className="newFolderModal" role="dialog" aria-modal="true" aria-labelledby="new-folder-title">
-        <header><h2 id="new-folder-title">Create new folder</h2><button type="button" onClick={onClose}><Icon src={icons.previewClose} />Close</button></header>
+        <header><h2 id="new-folder-title">Create new folder</h2><button type="button" aria-label="Close create folder dialog" onClick={onClose}><Icon src={icons.fileActivityClose} /></button></header>
         <form onSubmit={submitFolder}>
           <div className="folderLabelRow">
             <label htmlFor="new-folder-name">Folder name</label>
@@ -275,7 +300,7 @@ function RenameFolderModal({ currentName, onRename, onClose }: { currentName: st
   return (
     <div className="newFolderBackdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <section className="newFolderModal folderActionModal" role="dialog" aria-modal="true" aria-labelledby="rename-folder-title">
-        <header><h2 id="rename-folder-title">Rename folder</h2><button type="button" onClick={onClose}><Icon src={icons.previewClose} />Close</button></header>
+        <header><h2 id="rename-folder-title">Rename folder</h2><button type="button" aria-label="Close rename folder dialog" onClick={onClose}><Icon src={icons.fileActivityClose} /></button></header>
         <form onSubmit={(event) => { event.preventDefault(); if (name.trim()) onRename(name.trim()) }}>
           <div className="folderLabelRow">
             <label htmlFor="rename-folder-name">Folder name</label>
@@ -291,19 +316,22 @@ function RenameFolderModal({ currentName, onRename, onClose }: { currentName: st
   )
 }
 
-function DeleteFolderModal({ folderName, onConfirm, onClose }: { folderName: string; onConfirm: () => void; onClose: () => void }) {
+function DeleteItemModal({ itemName, itemType, onConfirm, onClose }: { itemName: string; itemType: 'file' | 'folder'; onConfirm: () => void; onClose: () => void }) {
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
     document.addEventListener('keydown', closeOnEscape)
     return () => document.removeEventListener('keydown', closeOnEscape)
   }, [onClose])
+  const message = itemType === 'folder'
+    ? `‘${itemName}’ and all files inside it will be moved to Trash. Shared links to these files will stop working immediately. You can restore the folder from Trash for 30 days before it is permanently deleted.`
+    : `‘${itemName}’ will be moved to Trash. Its shared link will stop working immediately. You can restore the file from Trash for 30 days before it is permanently deleted.`
   return (
-    <div className="newFolderBackdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
-      <section className="newFolderModal folderActionModal" role="alertdialog" aria-modal="true" aria-labelledby="delete-folder-title">
-        <header><h2 id="delete-folder-title">Delete folder</h2><button type="button" onClick={onClose}><Icon src={icons.previewClose} />Close</button></header>
-        <div className="deleteFolderContent">
-          <p>Delete “{folderName}”? This action cannot be undone.</p>
-          <div><button type="button" onClick={onClose}>Cancel</button><button className="dangerModalButton" type="button" onClick={onConfirm}>Delete</button></div>
+    <div className="newFolderBackdrop deleteItemBackdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+      <section className="deleteItemModal" role="alertdialog" aria-modal="true" aria-labelledby="delete-item-title">
+        <header><div><img src="/assets/delete-modal-trash.svg" alt="" aria-hidden="true" /><h2 id="delete-item-title">Delete {itemType}</h2></div><button type="button" aria-label="Close delete dialog" onClick={onClose}><img src="/assets/delete-modal-close.svg" alt="" aria-hidden="true" /></button></header>
+        <div className="deleteItemContent">
+          <p>{message}</p>
+          <footer><button type="button" onClick={onClose}>Cancel</button><button className="deleteItemConfirm" type="button" onClick={onConfirm}><img src="/assets/delete-modal-confirm.svg" alt="" aria-hidden="true" />Delete now</button></footer>
         </div>
       </section>
     </div>
@@ -392,6 +420,7 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack }: { fol
   const [copyFeedback, setCopyFeedback] = useState<CopyFeedback>(null)
   const [downloadFeedback, setDownloadFeedback] = useState<DownloadFeedback>(null)
   const [openFileMenu, setOpenFileMenu] = useState<number | null>(null)
+  const [fileToDelete, setFileToDelete] = useState<{ file: FolderFile; index: number } | null>(null)
   const [isDraggingFiles, setIsDraggingFiles] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [splitPercent, setSplitPercent] = useState(50)
@@ -590,7 +619,7 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack }: { fol
                 <button className="darkIcon" type="button" role="menuitem" onClick={() => { setInfoFile(file); setOpenFileMenu(null) }}><Icon src={icons.previewInfo} />Info</button>
                 <button className="darkIcon" type="button" role="menuitem" onClick={() => { void copyFileLink(file); setOpenFileMenu(null) }}><Icon src={icons.previewCopy} />Copy link</button>
                 <button className="darkIcon" type="button" role="menuitem" onClick={() => { downloadFile(file); setOpenFileMenu(null) }}><Icon src={icons.previewDownload} />Download</button>
-                <button type="button" role="menuitem" onClick={() => { setFolderItems((items) => { const next = items.filter((_, itemIndex) => itemIndex !== index); onItemsChange(next); return next }); if (selectedFile === file) setSelectedFile(null); setOpenFileMenu(null) }}><Icon src={icons.actionDelete} />Delete</button>
+                <button type="button" role="menuitem" onClick={() => { setFileToDelete({ file, index }); setOpenFileMenu(null) }}><Icon src={icons.actionDelete} />Delete</button>
               </div>
             )}
           </div>
@@ -680,6 +709,7 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack }: { fol
       {infoFile && <FileActivityModal file={infoFile} onClose={() => setInfoFile(null)} />}
       {copyFeedback && !selectedFile && <CopyTooltip feedback={copyFeedback} global />}
       {downloadFeedback && <DownloadToast feedback={downloadFeedback} onRetry={() => downloadFile(downloadFeedback.file)} onClose={() => setDownloadFeedback(null)} />}
+      {fileToDelete && <DeleteItemModal itemName={fileToDelete.file.name} itemType="file" onClose={() => setFileToDelete(null)} onConfirm={() => { const deleted = fileToDelete; setFolderItems((items) => { const next = items.filter((_, itemIndex) => itemIndex !== deleted.index); onItemsChange(next); return next }); if (selectedFile === deleted.file) setSelectedFile(null); setFileToDelete(null) }} />}
     </div>
   )
 }
@@ -697,8 +727,8 @@ function FileActivityModal({ file, onClose }: { file: FolderFile; onClose: () =>
     <div className="activityModalBackdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <section className="activityModal" role="dialog" aria-modal="true" aria-labelledby="file-activity-title">
         <header className="activityModalHeader">
-          <h2 id="file-activity-title">File Activity</h2>
-          <button type="button" onClick={onClose}><Icon src={icons.previewClose} />Close</button>
+          <h2 id="file-activity-title"><Icon src={icons.fileActivityInfo} />File Activity</h2>
+          <button type="button" onClick={onClose} aria-label="Close file activity"><Icon src={icons.fileActivityClose} /></button>
         </header>
         <div className="activityModalBody">
           <div className="activityMetrics">
@@ -733,13 +763,19 @@ function CopyTooltip({ feedback, global = false }: { feedback: NonNullable<CopyF
 }
 
 function DownloadToast({ feedback, onRetry, onClose }: { feedback: NonNullable<DownloadFeedback>; onRetry: () => void; onClose: () => void }) {
+  if (feedback.status === 'success') return (
+    <div className="apiCreatedToast" role="status" aria-live="polite">
+      <span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span>
+      <div><strong>Download complete</strong><span>{feedback.file.name} was downloaded successfully.</span></div>
+    </div>
+  )
   return (
-    <div className={`downloadToast ${feedback.status}`} role={feedback.status === 'failure' ? 'alert' : 'status'} aria-live="polite">
-      <Icon src={feedback.status === 'success' ? icons.downloadSuccess : icons.previewClose} />
+    <div className="downloadToast failure" role="alert" aria-live="polite">
+      <Icon src={icons.previewClose} />
       <div className="downloadToastText">
-        <strong>{feedback.status === 'success' ? 'Download complete' : 'Download failed'}</strong>
-        <span>{feedback.status === 'success' ? feedback.file.name : `Couldn’t download ${feedback.file.name}.`}</span>
-        {feedback.status === 'failure' && <button type="button" onClick={onRetry}>Try again</button>}
+        <strong>Download failed</strong>
+        <span>Couldn’t download {feedback.file.name}.</span>
+        <button type="button" onClick={onRetry}>Try again</button>
       </div>
       <button className="downloadToastClose" type="button" onClick={onClose} aria-label="Dismiss notification" />
     </div>
@@ -993,6 +1029,10 @@ function Stats({ folderCount, fileCount, storageUsed }: { folderCount: number; f
 }
 
 export default function App() {
+  const [workspaceName, setWorkspaceName] = useState(() => {
+    try { return JSON.parse(window.localStorage.getItem('beam-settings-v2') ?? '{}').workspaceName || 'Personal' }
+    catch { return 'Personal' }
+  })
   const [folderRows, setFolderRows] = useState<Folder[]>(folders)
   const [homeFiles, setHomeFiles] = useState<FileRow[]>(files)
   const [folderContents, setFolderContents] = useState<Record<string, FolderFile[]>>(initialFolderContents)
@@ -1000,11 +1040,19 @@ export default function App() {
   const [isSearching, setIsSearching] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchFilter, setSearchFilter] = useState<'all' | FileKind>('all')
-  const [currentView, setCurrentView] = useState<'home' | 'folder' | 'apiKeys'>('home')
+  const [currentView, setCurrentView] = useState<AppView>(() => {
+    const requestedView = new URLSearchParams(window.location.search).get('view')
+    return requestedView === 'settings' || requestedView === 'apiKeys' ? requestedView : 'home'
+  })
   const [selectedFolderName, setSelectedFolderName] = useState('Folder 001')
   const [folderToRename, setFolderToRename] = useState<string | null>(null)
   const [folderToDelete, setFolderToDelete] = useState<string | null>(null)
   const [isEmptyCreateOpen, setIsEmptyCreateOpen] = useState(false)
+  const [settingsDirty, setSettingsDirty] = useState(false)
+  const [settingsLeaveRequest, setSettingsLeaveRequest] = useState(0)
+  const [pendingView, setPendingView] = useState<AppView | null>(null)
+  const [settingsSaveToast, setSettingsSaveToast] = useState('')
+  const settingsSaveToastTimer = useRef<number | null>(null)
 
   const normalizedQuery = searchQuery.trim().toLowerCase()
   const searchResults = homeFiles.filter((file) =>
@@ -1015,6 +1063,33 @@ export default function App() {
   const totalStorageBytes = Object.values(folderContents).flat().reduce((total, file) => total + fileSizeInBytes(file.size), 0)
   const storageSummary = `${Math.round(totalStorageBytes / (1024 * 1024)).toLocaleString('en-US')} MB`
 
+  useEffect(() => {
+    const restoreViewFromUrl = () => {
+      const requestedView = new URLSearchParams(window.location.search).get('view')
+      setCurrentView(requestedView === 'settings' || requestedView === 'apiKeys' ? requestedView : 'home')
+    }
+    window.addEventListener('popstate', restoreViewFromUrl)
+    return () => window.removeEventListener('popstate', restoreViewFromUrl)
+  }, [])
+
+  const commitView = (view: AppView) => {
+    setCurrentView(view)
+    const url = new URL(window.location.href)
+    if (view === 'home' || view === 'folder') url.searchParams.delete('view')
+    else url.searchParams.set('view', view)
+    url.hash = ''
+    window.history.pushState({}, '', url)
+  }
+
+  const openView = (view: AppView) => {
+    if (currentView === 'settings' && settingsDirty && view !== 'settings') {
+      setPendingView(view)
+      setSettingsLeaveRequest((request) => request + 1)
+      return
+    }
+    commitView(view)
+  }
+
   const startSearch = () => {
     setIsSidebarCollapsed(false)
   }
@@ -1024,13 +1099,13 @@ export default function App() {
     setIsSearching(query.trim().length > 0)
     if (query.trim().length === 0) {
       setSearchFilter('all')
-      setCurrentView('home')
+      openView('home')
     }
   }
 
   const openFolder = (name: string) => {
     setSelectedFolderName(name)
-    setCurrentView('folder')
+    openView('folder')
     setSearchQuery('')
     setIsSearching(false)
     setSearchFilter('all')
@@ -1040,7 +1115,7 @@ export default function App() {
     setFolderRows((current) => [...current, { name, count: 0 }])
     setHomeFiles((current) => [...current, { name, size: '0B', modified: 'Just now', kind: 'folder' }])
     setFolderContents((current) => ({ ...current, [name]: [] }))
-    setCurrentView('home')
+    openView('home')
     setSearchQuery('')
     setIsSearching(false)
   }
@@ -1065,13 +1140,20 @@ export default function App() {
       const { [folderToDelete]: _deletedItems, ...remaining } = current
       return remaining
     })
-    if (selectedFolderName === folderToDelete) setCurrentView('home')
+    if (selectedFolderName === folderToDelete) openView('home')
     setFolderToDelete(null)
+  }
+
+  const showSettingsSaveToast = (changeCount: number) => {
+    if (settingsSaveToastTimer.current !== null) window.clearTimeout(settingsSaveToastTimer.current)
+    setSettingsSaveToast(`${changeCount} ${changeCount === 1 ? 'change' : 'changes'} saved successfully`)
+    settingsSaveToastTimer.current = window.setTimeout(() => setSettingsSaveToast(''), 3000)
   }
 
   return (
     <main className={`appShell${isSidebarCollapsed ? ' sidebarCollapsed' : ''}`}>
       <Sidebar
+        workspaceName={workspaceName}
         folders={folderRows}
         activeFolderName={selectedFolderName}
         isCollapsed={isSidebarCollapsed}
@@ -1083,10 +1165,16 @@ export default function App() {
         onOpenFolder={openFolder}
         onCreateFolder={createFolder}
         isApiKeysActive={currentView === 'apiKeys'}
-        onOpenApiKeys={() => { setCurrentView('apiKeys'); setSearchQuery(''); setIsSearching(false) }}
+        onOpenApiKeys={() => { openView('apiKeys'); setSearchQuery(''); setIsSearching(false) }}
+        isSettingsActive={currentView === 'settings'}
+        onOpenSettings={() => { openView('settings'); setSearchQuery(''); setIsSearching(false) }}
       />
       <section className="content">
-        {currentView === 'apiKeys' && !isSearching ? <ApiKeysPage /> : currentView === 'folder' && !isSearching ? <FolderDetail key={selectedFolderName} folderName={selectedFolderName} initialItems={folderContents[selectedFolderName] ?? []} onItemsChange={(items) => {
+        {currentView === 'settings' && !isSearching ? <SettingsPage onOpenApiKeys={() => openView('apiKeys')} onWorkspaceNameChange={setWorkspaceName} onDirtyChange={setSettingsDirty} onSaveSuccess={showSettingsSaveToast} leaveRequest={settingsLeaveRequest} onLeaveResolved={(proceed) => {
+          if (!proceed) { setPendingView(null); return }
+          setSettingsDirty(false)
+          if (pendingView) { const nextView = pendingView; setPendingView(null); commitView(nextView) }
+        }} /> : currentView === 'apiKeys' && !isSearching ? <ApiKeysPage /> : currentView === 'folder' && !isSearching ? <FolderDetail key={selectedFolderName} folderName={selectedFolderName} initialItems={folderContents[selectedFolderName] ?? []} onItemsChange={(items) => {
           setFolderContents((current) => ({ ...current, [selectedFolderName]: items }))
           setFolderRows((current) => current.map((folder) => folder.name === selectedFolderName ? { ...folder, count: items.length } : folder))
           setHomeFiles((current) => current.map((file) => file.name === selectedFolderName ? { ...file, size: formatFileSize(items.reduce((total, item) => total + fileSizeInBytes(item.size), 0)), modified: 'Just now' } : file))
@@ -1119,8 +1207,9 @@ export default function App() {
           </>
         )}
       </section>
+      {settingsSaveToast && <div className="apiCreatedToast" role="status" aria-live="polite"><span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span><div><strong>Settings saved</strong><span>{settingsSaveToast}</span></div></div>}
       {folderToRename && <RenameFolderModal currentName={folderToRename} onRename={renameFolder} onClose={() => setFolderToRename(null)} />}
-      {folderToDelete && <DeleteFolderModal folderName={folderToDelete} onConfirm={deleteFolder} onClose={() => setFolderToDelete(null)} />}
+      {folderToDelete && <DeleteItemModal itemName={folderToDelete} itemType="folder" onConfirm={deleteFolder} onClose={() => setFolderToDelete(null)} />}
       {isEmptyCreateOpen && <NewFolderModal onCreate={(name) => { createFolder(name); setIsEmptyCreateOpen(false) }} onClose={() => setIsEmptyCreateOpen(false)} />}
     </main>
   )
