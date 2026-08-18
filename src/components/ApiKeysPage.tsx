@@ -181,6 +181,7 @@ export default function ApiKeysPage() {
   const [createdKey, setCreatedKey] = useState<{ name: string; value: string } | null>(null)
   const [isCreatedKeyVisible, setIsCreatedKeyVisible] = useState(false)
   const [createdCopyFeedback, setCreatedCopyFeedback] = useState<'success' | 'failure' | null>(null)
+  const [copiedKeyId, setCopiedKeyId] = useState<number | null>(null)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [keyToRevoke, setKeyToRevoke] = useState<ApiKey | null>(null)
   const [isRevoking, setIsRevoking] = useState(false)
@@ -191,6 +192,7 @@ export default function ApiKeysPage() {
   const copiedTimerRef = useRef<number | null>(null)
   const createdKeyTextRef = useRef<HTMLSpanElement>(null)
   const revokedToastTimerRef = useRef<number | null>(null)
+  const copiedKeyTimerRef = useRef<number | null>(null)
   const normalizedName = normalizeKeyName(name)
   const nameError = validateKeyName(name, keys)
   const isFormValid = !createdKey && !nameError && Boolean(access && permission && expires)
@@ -199,6 +201,7 @@ export default function ApiKeysPage() {
     if (createdToastTimerRef.current !== null) window.clearTimeout(createdToastTimerRef.current)
     if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current)
     if (revokedToastTimerRef.current !== null) window.clearTimeout(revokedToastTimerRef.current)
+    if (copiedKeyTimerRef.current !== null) window.clearTimeout(copiedKeyTimerRef.current)
   }, [])
 
   useEffect(() => {
@@ -252,6 +255,17 @@ export default function ApiKeysPage() {
       })
     }
     copiedTimerRef.current = window.setTimeout(() => setCreatedCopyFeedback(null), 2200)
+  }
+
+  const copyKeyReference = async (key: ApiKey) => {
+    if (copiedKeyTimerRef.current !== null) window.clearTimeout(copiedKeyTimerRef.current)
+    try {
+      await navigator.clipboard.writeText(maskKey(key))
+      setCopiedKeyId(key.id)
+      copiedKeyTimerRef.current = window.setTimeout(() => setCopiedKeyId(null), 2200)
+    } catch {
+      setCopiedKeyId(null)
+    }
   }
 
   const revokeKey = async () => {
@@ -337,6 +351,10 @@ export default function ApiKeysPage() {
             <div className="apiKeyValue" role="row">
               <div role="cell">
                 <span className="apiKeyText">{maskKey(key)}</span>
+                <span className="apiCopyControl">
+                  <button type="button" onClick={() => void copyKeyReference(key)} aria-label={`Copy masked API key reference for ${key.name}`}><img src={apiIcons.copy} alt="" /></button>
+                  {copiedKeyId === key.id && <span className="copyNotice" role="status">Key reference copied</span>}
+                </span>
               </div>
             </div>
           </div>
