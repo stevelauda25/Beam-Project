@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import ApiKeysPage from './components/ApiKeysPage'
 import SettingsPage from './components/SettingsPage'
+import AccountProfilePage from './components/AccountProfilePage'
+import BillingUsagePage from './components/BillingUsagePage'
 
 const icons = {
   personal: '/assets/personal.svg',
@@ -18,6 +20,7 @@ const icons = {
   more: '/assets/more.svg',
   accountChevron: '/assets/account-chevron.svg',
   accountChevronCollapsed: '/assets/account-chevron-collapsed.svg',
+  accountPlanArrow: '/assets/account-plan-arrow.svg',
   actionOpen: '/assets/action-open.svg',
   actionRename: '/assets/action-rename.svg',
   actionDelete: '/assets/action-delete.svg',
@@ -50,7 +53,7 @@ const icons = {
 type Folder = { name: string; count: number; active?: boolean }
 type FileKind = 'folder' | 'file'
 type FileRow = { name: string; size: string; modified: string; badge?: string; kind: FileKind }
-type AppView = 'home' | 'folder' | 'apiKeys' | 'settings'
+type AppView = 'home' | 'folder' | 'apiKeys' | 'settings' | 'account' | 'billing'
 
 const folders: Folder[] = [
   { name: 'Folder 001', count: 4, active: true },
@@ -115,10 +118,13 @@ type SidebarProps = {
   onOpenApiKeys: () => void
   isSettingsActive: boolean
   onOpenSettings: () => void
+  onOpenAccount: () => void
+  onOpenBilling: () => void
 }
 
-function Sidebar({ workspaceName, folders: sidebarFolders, activeFolderName, isCollapsed, isSearching, searchQuery, onToggle, onStartSearch, onSearchChange, onOpenFolder, onCreateFolder, isApiKeysActive, onOpenApiKeys, isSettingsActive, onOpenSettings }: SidebarProps) {
+function Sidebar({ workspaceName, folders: sidebarFolders, activeFolderName, isCollapsed, isSearching, searchQuery, onToggle, onStartSearch, onSearchChange, onOpenFolder, onCreateFolder, isApiKeysActive, onOpenApiKeys, isSettingsActive, onOpenSettings, onOpenAccount, onOpenBilling }: SidebarProps) {
   const [isOrgMenuOpen, setIsOrgMenuOpen] = useState(false)
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const [folderCreateError, setFolderCreateError] = useState('')
@@ -162,6 +168,22 @@ function Sidebar({ workspaceName, folders: sidebarFolders, activeFolderName, isC
     }
   }, [isOrgMenuOpen])
 
+  useEffect(() => {
+    if (!isAccountMenuOpen) return
+    const closeMenu = (event: MouseEvent) => {
+      if (!(event.target as HTMLElement).closest('[data-account-menu]')) setIsAccountMenuOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsAccountMenuOpen(false)
+    }
+    document.addEventListener('mousedown', closeMenu)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeMenu)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [isAccountMenuOpen])
+
   return (
     <>
     <aside className={`sidebar${isCollapsed ? ' collapsed' : ''}`}>
@@ -187,7 +209,7 @@ function Sidebar({ workspaceName, folders: sidebarFolders, activeFolderName, isC
                           key={organization.name}
                           onClick={() => { setActiveOrganization(organization.name); setIsOrgMenuOpen(false) }}
                         >
-                          {organization.personal ? <img className="avatar" src={icons.avatar} alt="" /> : <span className="organizationAvatar"><Icon src={organization.icon} /></span>}
+                          {organization.personal ? <img className="avatar" src="/assets/personal-menu-avatar.png" alt="" /> : <span className="organizationAvatar"><Icon src={organization.icon} /></span>}
                           <span>{organization.personal ? workspaceName : organization.name}</span>
                           {isActive && <Icon src={icons.orgCheck} />}
                         </button>
@@ -242,11 +264,36 @@ function Sidebar({ workspaceName, folders: sidebarFolders, activeFolderName, isC
           <button className={`plainButton${isApiKeysActive ? ' active' : ''}`} aria-label="API Keys" title={isCollapsed ? 'API Keys' : undefined} onClick={onOpenApiKeys}><Icon src={icons.key} /><span className="sidebarLabel">API Keys</span></button>
           <button className={`plainButton${isSettingsActive ? ' active' : ''}`} aria-label="Settings" title={isCollapsed ? 'Settings' : undefined} onClick={onOpenSettings}><Icon src={icons.settings} /><span className="sidebarLabel">Settings</span></button>
         </div>
-        <button className="accountRow" aria-label="Michele J. account" title={isCollapsed ? 'Michele J.' : undefined}>
-          <img className="avatar" src={icons.avatar} alt="Michele J." />
-          <span className="sidebarLabel">Michele J.</span>
-          <span className="accountChevronIcon"><Icon src={isCollapsed ? icons.accountChevronCollapsed : icons.accountChevron} /></span>
-        </button>
+        <div className="accountControl" data-account-menu>
+          {isAccountMenuOpen && (
+            <div className="accountMenu" role="menu" aria-label="Account menu">
+              <header className="accountIdentity">
+                <img src="/assets/account-menu-avatar.png" alt="" />
+                <div><strong>Michele J.</strong><span>michele@beam.app</span></div>
+              </header>
+              <section className="accountPlan" aria-label="Current plan and usage">
+                <div className="accountPlanHeading"><strong>Free plan</strong><span>24% used</span></div>
+                <div className="accountUsageBody">
+                  <div className="accountUsageTrack" aria-hidden="true"><span /></div>
+                  <div className="accountUsageMeta"><span>1.2 GB of 5 GB</span><button type="button" aria-label="Open billing and usage" onClick={() => { setIsAccountMenuOpen(false); onOpenBilling() }}><Icon src="/assets/account-menu-arrow.svg" /></button></div>
+                </div>
+              </section>
+              <div className="accountMenuGroup">
+                <button type="button" role="menuitem" onClick={() => { setIsAccountMenuOpen(false); onOpenAccount() }}>Account settings</button>
+                <button type="button" role="menuitem" onClick={() => { setIsAccountMenuOpen(false); onOpenBilling() }}>Billing &amp; usage</button>
+                <button type="button" role="menuitem" onClick={() => setIsAccountMenuOpen(false)}>Help &amp; feedback</button>
+              </div>
+              <div className="accountMenuGroup accountMenuFooter">
+                <button type="button" role="menuitem" onClick={() => setIsAccountMenuOpen(false)}>Sign out</button>
+              </div>
+            </div>
+          )}
+          <button className={`accountRow${isAccountMenuOpen ? ' active' : ''}`} aria-label="Open Michele J. account menu" aria-haspopup="menu" aria-expanded={isAccountMenuOpen} title={isCollapsed ? 'Michele J.' : undefined} onClick={() => setIsAccountMenuOpen((open) => !open)}>
+            <img className="avatar" src={icons.avatar} alt="Michele J." />
+            <span className="sidebarLabel">Michele J.</span>
+            <span className={`accountChevronIcon${isAccountMenuOpen ? ' open' : ''}`}><Icon src={isCollapsed ? icons.accountChevronCollapsed : icons.accountChevron} /></span>
+          </button>
+        </div>
       </div>
     </aside>
     {folderCreateSuccess && <div className="apiCreatedToast" role="status" aria-live="polite"><span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span><div><strong>Folder created</strong><span>{folderCreateSuccess} was created successfully.</span></div></div>}
@@ -1042,7 +1089,7 @@ export default function App() {
   const [searchFilter, setSearchFilter] = useState<'all' | FileKind>('all')
   const [currentView, setCurrentView] = useState<AppView>(() => {
     const requestedView = new URLSearchParams(window.location.search).get('view')
-    return requestedView === 'settings' || requestedView === 'apiKeys' ? requestedView : 'home'
+    return requestedView === 'settings' || requestedView === 'apiKeys' || requestedView === 'account' || requestedView === 'billing' ? requestedView : 'home'
   })
   const [selectedFolderName, setSelectedFolderName] = useState('Folder 001')
   const [folderToRename, setFolderToRename] = useState<string | null>(null)
@@ -1066,7 +1113,7 @@ export default function App() {
   useEffect(() => {
     const restoreViewFromUrl = () => {
       const requestedView = new URLSearchParams(window.location.search).get('view')
-      setCurrentView(requestedView === 'settings' || requestedView === 'apiKeys' ? requestedView : 'home')
+      setCurrentView(requestedView === 'settings' || requestedView === 'apiKeys' || requestedView === 'account' || requestedView === 'billing' ? requestedView : 'home')
     }
     window.addEventListener('popstate', restoreViewFromUrl)
     return () => window.removeEventListener('popstate', restoreViewFromUrl)
@@ -1168,9 +1215,11 @@ export default function App() {
         onOpenApiKeys={() => { openView('apiKeys'); setSearchQuery(''); setIsSearching(false) }}
         isSettingsActive={currentView === 'settings'}
         onOpenSettings={() => { openView('settings'); setSearchQuery(''); setIsSearching(false) }}
+        onOpenAccount={() => { openView('account'); setSearchQuery(''); setIsSearching(false) }}
+        onOpenBilling={() => { openView('billing'); setSearchQuery(''); setIsSearching(false) }}
       />
       <section className="content">
-        {currentView === 'settings' && !isSearching ? <SettingsPage onOpenApiKeys={() => openView('apiKeys')} onWorkspaceNameChange={setWorkspaceName} onDirtyChange={setSettingsDirty} onSaveSuccess={showSettingsSaveToast} leaveRequest={settingsLeaveRequest} onLeaveResolved={(proceed) => {
+        {currentView === 'billing' && !isSearching ? <BillingUsagePage /> : currentView === 'account' && !isSearching ? <AccountProfilePage /> : currentView === 'settings' && !isSearching ? <SettingsPage onOpenApiKeys={() => openView('apiKeys')} onWorkspaceNameChange={setWorkspaceName} onDirtyChange={setSettingsDirty} onSaveSuccess={showSettingsSaveToast} leaveRequest={settingsLeaveRequest} onLeaveResolved={(proceed) => {
           if (!proceed) { setPendingView(null); return }
           setSettingsDirty(false)
           if (pendingView) { const nextView = pendingView; setPendingView(null); commitView(nextView) }

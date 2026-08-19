@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import ProgressBar from './ProgressBar'
+import SelectControl from './SelectControl'
+import Toggle from './Toggle'
 
 type SettingsPageProps = {
   onOpenApiKeys: () => void
@@ -23,62 +26,11 @@ const icons = {
   plus: '/assets/settings-plus.svg', monitor: '/assets/settings-monitor.svg', trash: '/assets/settings-trash.svg',
   review: '/assets/settings-review.svg',
   reviewClose: '/assets/settings-review-close.svg', reviewArrow: '/assets/settings-review-undo.svg', reviewUndo: '/assets/settings-review-save.svg', reviewSave: '/assets/settings-review-arrow.svg',
-  toggleActive: '/assets/settings-toggle-active.svg', toggleInactive: '/assets/settings-toggle-inactive.svg',
 } as const
 
 const sections = [['general', 'General'], ['files-storage', 'Files and storage'], ['sharing-access', 'Sharing and access'], ['security', 'Security'], ['workspace-data', 'Workspace data'], ['danger-zone', 'Danger zone']] as const
 
 function Icon({ src }: { src: string }) { return <img className="settingsIcon" src={src} alt="" aria-hidden="true" /> }
-
-function Toggle({ checked, onChange, label, saving = false }: { checked: boolean; onChange: (value: boolean) => void; label: string; saving?: boolean }) {
-  return <label className={`settingsToggle${checked ? ' checked' : ''}${saving ? ' saving' : ''}`}><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} aria-busy={saving} /><span className="settingsToggleHit"><span className="settingsToggleTrack"><span className="settingsToggleThumb"><img src={checked ? icons.toggleActive : icons.toggleInactive} alt="" aria-hidden="true" /></span></span></span><span className="srOnly">{label}</span></label>
-}
-
-function SelectControl({ value, options, icon, label, onChange }: { value: string; options: string[]; icon?: string; label: string; onChange: (value: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const [focusedIndex, setFocusedIndex] = useState(() => Math.max(0, options.indexOf(value)))
-  const rootRef = useRef<HTMLDivElement>(null)
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const optionRefs = useRef<Array<HTMLButtonElement | null>>([])
-  const typeBuffer = useRef('')
-  const typeTimer = useRef<number | undefined>(undefined)
-
-  useEffect(() => {
-    if (!open) return
-    const closeOutside = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) { setOpen(false); triggerRef.current?.focus() } }
-    document.addEventListener('mousedown', closeOutside)
-    return () => document.removeEventListener('mousedown', closeOutside)
-  }, [open])
-
-  useEffect(() => { if (open) optionRefs.current[focusedIndex]?.focus() }, [focusedIndex, open])
-
-  const choose = (option: string) => { onChange(option); setOpen(false); requestAnimationFrame(() => triggerRef.current?.focus()) }
-  const openAt = (index: number) => { setFocusedIndex(index); setOpen(true) }
-  const handleTriggerKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault(); openAt(event.key === 'ArrowUp' ? options.length - 1 : Math.max(0, options.indexOf(value)))
-    }
-  }
-  const handleOptionKeyDown = (event: React.KeyboardEvent, index: number) => {
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setFocusedIndex((index + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length) }
-    else if (event.key === 'Home' || event.key === 'End') { event.preventDefault(); setFocusedIndex(event.key === 'Home' ? 0 : options.length - 1) }
-    else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(options[index]) }
-    else if (event.key === 'Escape' || event.key === 'Tab') { setOpen(false); if (event.key === 'Escape') { event.preventDefault(); triggerRef.current?.focus() } }
-    else if (event.key.length === 1 && /\S/.test(event.key)) {
-      typeBuffer.current += event.key.toLowerCase(); window.clearTimeout(typeTimer.current)
-      const match = options.findIndex((option) => option.toLowerCase().startsWith(typeBuffer.current))
-      if (match >= 0) setFocusedIndex(match)
-      typeTimer.current = window.setTimeout(() => { typeBuffer.current = '' }, 500)
-    }
-  }
-
-  return <div className={`settingsSelect${open ? ' open' : ''}`} ref={rootRef}>
-    <button ref={triggerRef} className="settingsSelectTrigger" type="button" aria-label={`${label}: ${value}`} aria-haspopup="listbox" aria-expanded={open} onClick={() => open ? setOpen(false) : openAt(Math.max(0, options.indexOf(value)))} onKeyDown={handleTriggerKeyDown}>
-      {icon && <Icon src={icon} />}<span>{value}</span><Icon src={icons.chevron} />
-    </button>
-    {open && <div className="settingsSelectMenu" role="listbox" aria-label={label}>{options.map((option, index) => <button ref={(node) => { optionRefs.current[index] = node }} className={`${option === value ? 'selected ' : ''}${index === focusedIndex ? 'focused' : ''}`} type="button" role="option" aria-selected={option === value} tabIndex={index === focusedIndex ? 0 : -1} key={option} onMouseEnter={() => setFocusedIndex(index)} onKeyDown={(event) => handleOptionKeyDown(event, index)} onClick={() => choose(option)}><span>{option}</span>{option === value && <Icon src={icons.check} />}</button>)}</div>}
-  </div>
-}
 
 function Row({ label, children, infoText, description }: { label: string; children: React.ReactNode; infoText?: string; description?: string }) {
   const tooltipId = `settings-tip-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
@@ -231,7 +183,7 @@ export default function SettingsPage({ onOpenApiKeys, onWorkspaceNameChange, onD
           </section>
 
           <section className="settingsGroup" id="files-storage"><header><h2>Files and storage</h2></header>
-            <div className="settingsStorage"><div><span>Storage used</span><span>1,276 MB <em>of 5,120 MB</em></span></div><div className="settingsStorageTrack"><span /></div></div>
+            <div className="settingsStorage"><div><span>Storage used</span><span>1,276 MB <em>of 5,120 MB</em></span></div><ProgressBar value={25} label="Storage used" /></div>
             <Row label="Default view"><SelectControl label="Default view" value={defaultView} options={['List', 'Grid']} icon={icons.list} onChange={setDefaultView} /></Row>
             <Row label="Trash retention"><SelectControl label="Trash retention" value={trashRetention} options={['7 days', '30 days', '90 days']} onChange={setTrashRetention} /></Row>
             <Row label="Confirm permanent deletion" infoText="Ask for confirmation before a file is permanently deleted."><Toggle label="Confirm permanent deletion" checked={confirmDelete} onChange={setConfirmDelete} /></Row>
