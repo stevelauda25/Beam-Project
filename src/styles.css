@@ -4,6 +4,20 @@
   font-family: 'TikTok Sans', Arial, sans-serif;
   color: #0a0a0a;
   background: #fff;
+  color-scheme: light;
+  --app-background: #fff;
+  --surface-primary: #fff;
+  --surface-secondary: #fafafa;
+  --surface-tertiary: #f5f5f5;
+  --surface-hover: #f0f0f0;
+  --surface-input: #fff;
+  --text-primary: #0a0a0a;
+  --text-secondary: #525252;
+  --text-muted: #7a7a7a;
+  --placeholder-text: #7a7a7a;
+  --border-default: rgba(0,0,0,.1);
+  --border-strong: rgba(0,0,0,.2);
+  --shadow-color: rgba(0,0,0,.14);
   font-synthesis: none;
   --border: rgba(0, 0, 0, 0.1);
   --muted: #7a7a7a;
@@ -16,6 +30,40 @@
   --beam-success-subtle: #ecfdf3;
   --beam-warning: #d18b0c;
   --beam-warning-subtle: #fff8e6;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  color: #fff;
+  background: #141414;
+  --app-background: #1f1f1f;
+  --surface-primary: #1f1f1f;
+  --surface-secondary: #292929;
+  --surface-tertiary: #292929;
+  --surface-hover: #292929;
+  --surface-input: #1f1f1f;
+  --text-primary: #fff;
+  --text-secondary: #ccc;
+  --text-muted: #a3a3a3;
+  --placeholder-text: #666;
+  --status-success-background: #0a4a2d;
+  --status-success-text: #41cb85;
+  --status-neutral-background: #3d3d3d;
+  --status-neutral-text: #c2c2c2;
+  --danger-text: #f13546;
+  --danger-border: rgba(241,53,70,.5);
+  --danger-surface: #321b1e;
+  --border-default: rgba(255,255,255,.1);
+  --border-strong: rgba(255,255,255,.18);
+  --shadow-color: rgba(0,0,0,.5);
+  --border: var(--border-default);
+  --muted: var(--text-muted);
+  --surface: var(--surface-hover);
+  --beam-text-secondary: var(--text-secondary);
+  --beam-text-muted: var(--text-muted);
+  --beam-accent-subtle: #263638;
+  --beam-success-subtle: #162b22;
+  --beam-warning-subtle: #302819;
 }
 
 * { box-sizing: border-box; }
@@ -31,6 +79,10 @@ button { font: inherit; color: inherit; }
 
 .appShell { width: 100%; height: 100dvh; overflow: hidden; background: #fff; font-size: 12px; line-height: 18px; }
 .sidebar { position: fixed; inset: 0 auto 0 0; width: 216px; display: flex; flex-direction: column; justify-content: space-between; padding: 12px 8px; overflow: hidden; border-right: .5px solid var(--border); background: #fff; will-change: width; }
+.sidebar:has(.organizationMenu, .accountMenu) {
+  z-index: 100;
+  overflow: visible;
+}
 .sidebar.collapsed { width: 43px; }
 .sidebarTop { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .workspaceRow { display: flex; width: 100%; height: 26px; flex: 0 0 26px; align-items: center; justify-content: space-between; padding: 4px 28px 4px 8px; }
@@ -54,9 +106,9 @@ button { font: inherit; color: inherit; }
   gap: 0;
   padding: 2px 0 0;
   overflow: hidden;
-  border: .5px solid rgba(255,255,255,.5);
+  border: .5px solid rgba(255,255,255,.2);
   border-radius: 6px;
-  background: linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.2)),#525252;
+  background: linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.2)),#3d3d3d;
   box-shadow: 0 1px 2px -1px rgba(0,0,0,.25),0 2px 4px -2px rgba(0,0,0,.2),0 4px 8px -4px rgba(0,0,0,.15),0 8px 12px -4px rgba(0,0,0,.1),inset 0 .5px .5px rgba(255,255,255,.25),inset 0 -.5px .5px rgba(0,0,0,.1);
   transform-origin: top center;
   animation: organization-menu-expand 320ms cubic-bezier(.22, 1, .36, 1) both;
@@ -64,7 +116,7 @@ button { font: inherit; color: inherit; }
 .organizationGroup,
 .accountGroup { display: flex; width: 100%; flex-direction: column; }
 .organizationGroup { padding: 0 2px 2px; }
-.accountGroup { padding: 2px; border-top: 1px solid rgba(255,255,255,.12); }
+.accountGroup { padding: 2px; border-top: .5px solid rgba(255,255,255,.12); }
 .organizationMenu .organizationGroup,
 .organizationMenu .accountGroup { animation: organization-menu-content 180ms ease-out 95ms both; }
 .organizationOption,
@@ -138,26 +190,40 @@ button { border: 0; background: transparent; cursor: pointer; }
 .accountRow:hover, .accountRow.active { background: #f5f5f5; }
 .accountRow > .sidebarLabel { min-width: 0; flex: 0 1 auto; }
 .avatar { width: 12px; height: 12px; flex: 0 0 12px; border: .3px solid rgba(0,0,0,.08); border-radius: 50%; object-fit: cover; }
-.accountMenu { position: fixed; z-index: 40; bottom: 42px; left: 8px; display: flex; width: 200px; flex-direction: column; padding: 2px 0 0; overflow: hidden; border: .5px solid rgba(255,255,255,.5); border-radius: 6px; color: #fff; background: linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.2)),#525252; box-shadow: 0 1px 2px -1px rgba(0,0,0,.25),0 2px 4px -2px rgba(0,0,0,.2),0 4px 8px -4px rgba(0,0,0,.15),0 8px 12px -4px rgba(0,0,0,.1),inset 0 .5px .5px rgba(255,255,255,.25),inset 0 -.5px .5px rgba(0,0,0,.1); transform-origin: bottom left; animation: account-menu-expand 240ms cubic-bezier(.22, 1, .36, 1) both; }
+.accountMenu { position: fixed; z-index: 40; bottom: 42px; left: 8px; display: flex; width: 200px; flex-direction: column; padding: 2px 0 0; overflow: visible; border: .5px solid rgba(0,0,0,.2); border-radius: 6px; color: #141414; background: linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.2)),#e0e0e0; box-shadow: 0 1px 2px -1px #000,0 2px 4px -2px rgba(0,0,0,.2),0 4px 8px -4px rgba(0,0,0,.5),0 8px 12px -4px rgba(0,0,0,.1),inset 0 .5px .5px rgba(255,255,255,.25),inset 0 -.5px .5px rgba(0,0,0,.1); transform-origin: bottom left; animation: account-menu-expand 240ms cubic-bezier(.22, 1, .36, 1) both; }
 .accountIdentity { display: flex; min-width: 0; align-items: center; gap: 8px; padding: 8px; }
 .accountIdentity > img { width: 32px; height: 32px; flex: 0 0 32px; border: 1px solid rgba(255,255,255,.14); border-radius: 1000px; object-fit: cover; }
 .accountIdentity > div { display: flex; min-width: 0; flex-direction: column; }
 .accountIdentity strong, .accountIdentity span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .accountIdentity strong, .accountPlan strong { font-weight: 400; }
-.accountIdentity span { color: #c2c2c2; }
-.accountPlan { display: flex; height: 56px; flex-direction: column; gap: 6px; margin: 2px; padding: 4px 6px; border: .5px solid rgba(255,255,255,.1); border-radius: 4px; background: linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,0)),rgba(255,255,255,.1); box-shadow: 0 .5px 1px -1px rgba(0,0,0,.2),0 1px 2px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1),inset 0 .5px .5px rgba(255,255,255,.25),inset 0 -.5px .5px rgba(0,0,0,.25); }
+.accountIdentity span { color: #525252; }
+.accountPlan { display: flex; height: 56px; flex-direction: column; gap: 6px; margin: 2px; padding: 4px 6px; border: .5px solid rgba(0,0,0,.1); border-radius: 4px; color: #141414; background: linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.1)),#fff; box-shadow: 0 -.5px 1px -1px rgba(255,255,255,.2),0 1px 2px -1px rgba(0,0,0,.2),0 2px 4px -2px rgba(0,0,0,.1),inset 0 -.5px .5px rgba(0,0,0,.15),inset 0 .5px .5px rgba(255,255,255,.25); }
 .accountPlanHeading, .accountUsageMeta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.accountPlanHeading > span { color: #fff; font-size: 10px; }
+.accountPlanHeading > span { color: #141414; font-size: 10px; }
 .accountUsageBody { display: flex; width: 100%; flex-direction: column; gap: 2px; }
-.accountUsageTrack { width: calc(100% - 2px); height: 3px; flex: 0 0 3px; margin: 0 1px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.16); }
-.accountUsageTrack > span { display: block; width: 24%; height: 100%; border-radius: inherit; background: #fff; }
-.accountUsageMeta button { display: grid; width: 12px; height: 12px; padding: 0; color: #fff; place-items: center; }
-.accountUsageMeta { color: #fff; font-size: 10px; }
+.accountUsageTrack { width: calc(100% - 2px); height: 3px; flex: 0 0 3px; margin: 0 1px; overflow: hidden; border-radius: 999px; background: rgba(0,0,0,.1); }
+.accountUsageTrack > span { display: block; width: 24%; height: 100%; border-radius: inherit; background: #3d3d3d; }
+.accountUsageMeta button { display: grid; width: 12px; height: 12px; padding: 0; color: #141414; place-items: center; }
+.accountUsageMeta { color: #141414; font-size: 10px; }
 .accountMenuGroup { display: flex; flex-direction: column; padding: 2px; }
 .accountMenuGroup button { width: 100%; height: 24px; padding: 3px 5px 1px; border: 1px solid transparent; border-radius: 4px; color: inherit; text-align: left; }
 .accountMenuFooter button { padding-right: 6px; padding-left: 6px; }
-.accountMenuGroup button:hover, .accountMenuGroup button:focus-visible { outline: 0; border-color: rgba(255,255,255,.1); background: linear-gradient(180deg,rgba(255,255,255,.1),transparent),rgba(255,255,255,.1); }
-.accountMenuFooter { border-top: .5px solid rgba(255,255,255,.12); }
+.accountMenuGroup button:hover, .accountMenuGroup button:focus-visible { outline: 0; border-color: rgba(0,0,0,.1); background: rgba(0,0,0,.06); }
+.appearanceMenuControl { position: relative; }
+.appearanceMenuControl:has(.appearanceSubmenu)::after { position: absolute; top: 0; left: 100%; width: 5px; height: 24px; content: ''; }
+.appearanceMenuControl > button { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.appearanceMenuLabel { display: flex; min-width: 0; align-items: center; gap: 6px; }
+.appearanceMenuLabel img { width: 12px; height: 12px; flex: 0 0 12px; opacity: .82; }
+.accountMenuValue { display: flex; align-items: center; gap: 5px; color: #525252; font-size: 10px; }
+.accountMenuValue > span { color: #141414; font-size: 16px; line-height: 10px; }
+.appearanceSubmenu { position: absolute; z-index: 2; top: -2px; left: calc(100% + 5px); display: flex; width: 160px; flex-direction: column; padding: 2px; border: .5px solid rgba(0,0,0,.2); border-radius: 6px; color: #141414; background: linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.2)),#e0e0e0; box-shadow: 0 1px 2px -1px #000,0 4px 8px -4px rgba(0,0,0,.5),0 8px 12px -4px rgba(0,0,0,.1),inset 0 .5px .5px rgba(255,255,255,.25); animation: appearance-menu-enter 140ms cubic-bezier(.22,1,.36,1) both; }
+.appearanceSubmenu button { display: grid; grid-template-columns: 14px 1fr 14px; align-items: center; gap: 6px; }
+.appearanceSubmenu button.selected { border-color: rgba(0,0,0,.1); background: rgba(0,0,0,.06); }
+.appearanceSubmenu:has(button:hover) button.selected:not(:hover), .appearanceSubmenu:has(button:focus-visible) button.selected:not(:focus-visible) { border-color: transparent; background: transparent; }
+.appearanceThemeIcon { display: block; width: 12px; height: 12px; opacity: .82; }
+.appearanceCheck { color: #9dc0c4; text-align: center; }
+@keyframes appearance-menu-enter { from { opacity: 0; transform: translateX(-4px) scale(.98); } to { opacity: 1; transform: translateX(0) scale(1); } }
+.accountMenuFooter { border-top: .5px solid rgba(0,0,0,.15); }
 @keyframes account-menu-expand { from { opacity: 0; transform: translateY(5px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 .sidebar.collapsed .searchButton,
 .sidebar.collapsed .plainButton { height: 26px; justify-content: center; gap: 0; padding: 4px 7px; }
@@ -229,6 +295,8 @@ button { border: 0; background: transparent; cursor: pointer; }
 .accountPage { width: 100%; min-width: 900px; min-height: 100%; }
 .accountPageHeader { display: flex; height: 18px; align-items: center; padding: 0 8px; }
 .accountPageHeader h1 { margin: 0; padding: 0; font-size: 12px; line-height: 18px; font-weight: 400; }
+.accountPage .accountPageHeader { height: auto; padding: 0; }
+.accountPage .accountPageHeader h1 { margin: 0 0 12px; padding-left: 8px; }
 .accountSettingsLayout { display: grid; width: 100%; grid-template-columns: 168px minmax(0, 1fr); gap: 64px; align-items: start; }
 .accountSectionNav { position: sticky; top: 0; display: flex; width: 168px; grid-column: 1; grid-row: 1; flex-direction: column; gap: 4px; padding-top: 28px; }
 .accountSectionNav button { width: 100%; height: 22px; padding: 2px 8px; border-radius: 4px; text-align: left; }
@@ -247,7 +315,9 @@ button { border: 0; background: transparent; cursor: pointer; }
 .profilePhotoControl button { padding: 0; color: #0a0a0a; }
 .profileField, .profileEmail { display: flex; min-width: 260px; align-items: center; justify-content: flex-end; gap: 6px; }
 .profileField > span, .profileEmail > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.profileField input { width: 180px; height: 26px; padding: 4px 6px; border: .5px solid rgba(0,0,0,.2); border-radius: 4px; outline: 0; font: inherit; }
+.profileField input { width: auto; min-width: 48px; max-width: 260px; height: 26px; padding: 4px 6px; border: .5px solid rgba(0,0,0,.2); border-radius: 4px; outline: 0; font: inherit; text-align: right; field-sizing: content; }
+.profileField.invalid { position: relative; padding-bottom: 20px; }
+.profileFieldError { position: absolute; right: 18px; bottom: 0; color: #e51d31; font-size: 10px; line-height: 16px; }
 .profileField input:focus { border-color: #6b9094; }
 .profileLabelWithStatus { display: flex; align-items: center; gap: 4px; }
 .profileLabelWithStatus em { padding: 1px 5px; border-radius: 999px; color: #26705a; background: #e8f5ef; font-size: 10px; line-height: 16px; font-style: normal; }
@@ -349,7 +419,6 @@ button { border: 0; background: transparent; cursor: pointer; }
 .billingComparisonWrap th:first-child { width: 30%; color: #686868; }
 .billingComparisonWrap thead span { display: block; width: fit-content; margin-top: 2px; padding: 2px 4px; border-radius: 9999px; color: var(--beam-accent); background: var(--beam-accent-subtle); font-size: 10px; line-height: 10px; font-weight: 400; }
 .billingComparisonWrap tbody tr:last-child th, .billingComparisonWrap tbody tr:last-child td { border-bottom: 0; }
-.billingSuccess { position: sticky; z-index: 4; top: 8px; padding: 8px 12px; border: .5px solid var(--beam-success); border-radius: 6px; color: var(--beam-success); background: var(--beam-success-subtle); box-shadow: 0 3px 12px rgba(0,0,0,.08); font-size: 12px; line-height: 18px; }
 .billingModalBackdrop { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(0,0,0,.28); backdrop-filter: blur(1px); }
 .billingConfirmModal { width: min(420px, 100%); overflow: hidden; border: .5px solid rgba(0,0,0,.2); border-radius: 12px; background: #fff; box-shadow: 0 18px 50px rgba(0,0,0,.22); }
 .billingConfirmModal > header { display: flex; align-items: flex-start; justify-content: space-between; padding: 14px 16px; border-bottom: .5px solid var(--border); background: #f6f6f6; }
@@ -401,9 +470,18 @@ button { border: 0; background: transparent; cursor: pointer; }
 .billingSelect, .billingDetailsForm input, .billingDetailsForm select, .receiptPrimary input, .receiptAdd input, .addCardDialog input { height: 26px; padding: 4px 8px; border: .5px solid rgba(0,0,0,.2); border-radius: 4px; outline: 0; color: #0a0a0a; background: #fff; font: inherit; }
 .billingSelect:focus, .billingDetailsForm input:focus, .billingDetailsForm select:focus, .receiptPrimary input:focus, .receiptAdd input:focus, .addCardDialog input:focus { border-color: var(--beam-accent); box-shadow: 0 0 0 1px rgba(107,144,148,.15); }
 .billingPaymentCard { display: flex; min-height: 78px; align-items: center; justify-content: space-between; gap: 20px; padding: 12px; }
-.paymentCardIdentity > span { display: grid; width: 42px; height: 26px; border: .5px solid rgba(0,0,0,.15); border-radius: 4px; color: #fff; background: #233876; font-size: 10px; place-items: center; }
+.billingPaymentList { display: flex; flex-direction: column; }
+.billingPaymentList .billingPaymentCard + .billingPaymentCard { border-top: .5px solid var(--border); }
+.paymentCardIdentity > .paymentBrand { display: grid; width: 48px; height: 28.8px; flex: 0 0 48px; overflow: hidden; border-radius: 4.8px; place-items: center; }
+.paymentCardIdentity > .paymentBrandVisa { background: #fff; }
+.paymentCardIdentity > .paymentBrandVisa img { grid-area: 1 / 1; display: block; width: 38.4px; height: 12.4438px; object-fit: contain; }
+.paymentCardIdentity > .paymentBrandVisa .paymentBrandDark { display: none; }
+.paymentCardIdentity > .paymentBrandMastercard { background: #fff; }
+.paymentCardIdentity > .paymentBrandMastercard img { display: block; width: 19.2px; height: 11.87px; object-fit: contain; }
+.paymentCardIdentity > .paymentBrandFallback { border: .5px solid rgba(0,0,0,.15); color: #fff; background: #233876; font-size: 10px; }
 .billingPaymentCard > div:last-child { display: flex; align-items: center; gap: 10px; }
 .billingPaymentCard button { color: var(--beam-text-secondary); }
+.billingPaymentCard .setDefaultPayment { color: #0a0a0a; }
 .billingPaymentCard .dangerText { color: #e51d31; }
 .receiptPrimary { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; padding: 12px; border-bottom: .5px solid var(--border); }
 .receiptPrimary label, .billingDetailsForm label, .addCardDialog label { display: flex; flex-direction: column; gap: 4px; }
@@ -539,7 +617,6 @@ button { border: 0; background: transparent; cursor: pointer; }
 .figmaPaymentMethods > header button { height: 18px; }
 .billingPage .billingPaymentCard { height: 82px; min-height: 82px; padding: 16px 12px; }
 .billingPage .paymentCardIdentity { gap: 12px; }
-.billingPage .paymentCardIdentity > img { display: block; width: 48px; height: 16px; object-fit: contain; }
 .billingPage .paymentCardIdentity > div > div { display: flex; align-items: center; gap: 4px; }
 .paymentDefaultBadge { padding: 1px 5px; border-radius: 9999px; color: #525252; background: #f0f0f0; font-size: 10px; line-height: 16px; }
 .billingPage .billingPaymentCard > div:last-child { gap: 12px; }
@@ -553,7 +630,7 @@ button { border: 0; background: transparent; cursor: pointer; }
 .receiptValue button, .receiptRecipient button { display: grid; width: 12px; height: 12px; flex: 0 0 12px; place-items: center; padding: 0; border: 0; background: transparent; }
 .billingPage .receiptSendTest { display: flex; height: 18px; flex: 0 0 auto; align-items: center; gap: 6px; padding: 0; border: 0; color: #0a0a0a; background: transparent; }
 .billingPage .receiptSendTest img { width: 12px; height: 12px; }
-.billingPage .receiptRecipients { gap: 4px; padding: 16px 12px 12px; border-top: .5px solid var(--border); }
+.billingPage .receiptRecipients { gap: 4px; padding: 16px 12px 12px; border-top: 0; }
 .billingPage .receiptRecipient { display: flex; width: 100%; height: 26px; min-height: 26px; align-items: center; justify-content: space-between; padding: 4px 8px; border: 0; border-radius: 4px; background: #f5f5f5; }
 .billingPage .receiptRecipient button { width: 12px; height: 12px; padding: 0; }
 .receiptAddMore { display: flex; width: 100%; height: 26px; align-items: center; justify-content: center; gap: 6px; margin-top: 8px; padding: 4px 0; }
@@ -565,13 +642,25 @@ button { border: 0; background: transparent; cursor: pointer; }
 .billingPage .receiptAddField > button img, .billingPage .receiptAddCancel img { display: block; width: 12px; height: 12px; }
 .billingPage .receiptAddCancel { display: grid; width: 12px; height: 12px; flex: 0 0 12px; place-items: center; padding: 0; border: 0; background: transparent; }
 .billingPage .figmaBillingDetails > header button { height: 18px; }
+.billingDetailsHeaderActions { display: flex; align-items: center; gap: 20px; }
+.billingPage .figmaBillingDetails > header .billingDetailsHeaderActions button { height: 18px; padding: 0; border: 0; background: transparent; }
+.billingPage .figmaBillingDetails > header .billingDetailsHeaderActions .cancel { color: #8f8f8f; }
+.billingPage .figmaBillingDetails > header .billingDetailsHeaderActions .save { color: #129457; }
+.billingCountrySelect { width: 100%; border: .5px solid rgba(0,0,0,.2); background: #fff; }
+.billingCountrySelect .settingsSelectTrigger { width: 100%; justify-content: space-between; padding: 4px 8px; }
+.billingCountrySelect .settingsSelectTrigger > span { flex: 1; text-align: left; }
+.billingCountrySelect .settingsSelectTrigger .settingsIcon:last-child { margin-left: auto; }
+.billingCountrySelect .settingsSelectMenu { right: 0; left: 0; min-width: 100%; }
+:root[data-theme='dark'] .billingPage .figmaBillingDetails > header .billingDetailsHeaderActions .cancel { color: #a3a3a3; }
+:root[data-theme='dark'] .billingPage .figmaBillingDetails > header .billingDetailsHeaderActions .save { color: #41cb85; }
+:root[data-theme='dark'] .billingCountrySelect { border-color: rgba(255,255,255,.1); background: #1f1f1f; }
 .billingPage .billingDetailsSummary { grid-template-columns: 1fr 1fr 1fr; }
 .billingPage .billingDetailsSummary > div { height: 108px; min-height: 108px; gap: 4px; padding: 16px 12px; border-right-color: rgba(0,0,0,.1); }
 .billingPage .billingDetailsSummary span { color: #666; }
 .billingPage .billingDetailsSummary strong { color: #0a0a0a; line-height: 18px; }
 .billingPage .billingDetailsSummary > div:nth-child(3) { border-right: 0; }
 .figmaInvoices { display: flex; width: 100%; flex-direction: column; overflow: hidden; border-radius: 4px; }
-.billingPage .billingInvoiceHeader, .billingPage .billingInvoiceRow { grid-template-columns: minmax(0,1fr) 110px 60px 110px 64px; gap: 0; }
+.billingPage .billingInvoiceHeader, .billingPage .billingInvoiceRow { grid-template-columns: minmax(0,1fr) 100px 80px 100px 64px; gap: 0; }
 .billingPage .billingInvoiceHeader { height: 26px; padding: 0; border: .5px solid rgba(0,0,0,.1); border-radius: 4px 4px 0 0; color: #525252; background: #f5f5f5; }
 .billingPage .billingInvoiceHeader > span { height: 25px; padding: 4px 8px; overflow: hidden; }
 .billingPage .billingInvoiceHeader > span:first-child { padding-left: 12px; }
@@ -686,6 +775,7 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 .settingsToggleThumb img { display: block; width: 12px; height: 12px; }
 .settingsToggle.checked .settingsToggleTrack { justify-content: flex-end; border-color: rgba(0,0,0,.2); background-color: #6b9094; background-image: radial-gradient(ellipse 31.5px 50.308px at 73.256% 50%, rgba(0,0,0,.3) 0%, transparent 100%), radial-gradient(ellipse 21.5px 11.5px at 50% 50%, #9dc0c4 0%, #6b9094 100%); }
 .settingsToggle.checked .settingsToggleThumb { background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.12) 100%), #fff; box-shadow: 0 0 1px -6px rgba(0,0,0,.5), 0 0 1px rgba(0,0,0,.3), inset 0 -.5px .5px rgba(0,0,0,.2); }
+.settingsToggle.checked .settingsToggleThumb img { filter: none; opacity: 1; }
 .settingsToggle input:focus-visible + .settingsToggleHit { outline: 1px solid #6b9094; outline-offset: 2px; }
 .settingsToggle.saving { cursor: progress; }
 .settingsToggle.saving .settingsToggleTrack { opacity: .72; }
@@ -710,10 +800,12 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 .settingsDeleteModal > div { display: flex; min-height: 112px; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 24px; padding: 12px; border: .5px solid #c4c4c4; border-radius: 6px; background: #fff; box-shadow: 0 8px 16px -6px rgba(0,0,0,.04), inset 0 -.5px .5px rgba(0,0,0,.1); }
 .settingsDeleteModal p { width: 100%; margin: 0; color: #525252; }
 .settingsDeleteModal > div button { height: 18px; padding: 0; color: #525252; background: transparent; }
-.settingsUtilityContent { display: flex; min-height: 112px; flex-direction: column; gap: 10px; padding: 12px; border: .5px solid #c4c4c4; border-radius: 6px; background: #fff; box-shadow: 0 8px 16px -6px rgba(0,0,0,.04), inset 0 -.5px .5px rgba(0,0,0,.1); }
+.settingsUtilityContent { display: flex; min-height: 112px; flex-direction: column; gap: 2px; padding: 12px; border: .5px solid #c4c4c4; border-radius: 6px; background: #fff; box-shadow: 0 8px 16px -6px rgba(0,0,0,.04), inset 0 -.5px .5px rgba(0,0,0,.1); }
 .settingsUtilityContent > div { display: flex; justify-content: space-between; gap: 16px; }
 .settingsUtilityContent strong { font-weight: 400; }
 .settingsUtilityContent p { margin: 0; color: #7a7a7a; }
+.settingsUtilityContent footer { display: flex; margin-top: auto; justify-content: flex-end; }
+.settingsUtilityContent footer button { height: 18px; padding: 0; color: #0a0a0a; background: transparent; }
 .settingsUnsavedBar { position: fixed; z-index: 45; right: 24px; bottom: 24px; display: flex; width: 302px; max-width: calc(100vw - 32px); height: 35px; align-items: center; justify-content: space-between; padding: 8px 12px; border: .5px solid rgba(255,255,255,.5); border-radius: 4px; color: #fff; background: #525252; box-shadow: 0 1px 2px rgba(0,0,0,.1), 0 4px 8px -4px rgba(0,0,0,.08), 0 6px 12px -6px rgba(0,0,0,.06), 0 8px 16px -6px rgba(0,0,0,.04), inset 0 -.5px .5px rgba(0,0,0,.1); }
 .settingsUnsavedBar button { display: flex; height: 18px; align-items: center; gap: 6px; padding: 0; color: #fff; background: transparent; }
 .settingsUnsavedBar button .settingsIcon { filter: none; }
@@ -736,6 +828,9 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 .settingsReviewModal footer .settingsReviewSave { color: #129457; background: transparent; }
 .settingsReviewModal footer button:focus-visible { outline: 1px solid currentColor; outline-offset: 2px; }
 .settingsReviewError { padding: 8px 12px; color: #a20d22; background: #fff0f1; }
+.settingsThemeIcon { display: grid; width: 12px; height: 12px; flex: 0 0 12px; place-items: center; }
+.settingsThemeIcon > img { grid-area: 1 / 1; }
+.settingsThemeIcon .darkAsset { display: none; }
 
 @media (max-width: 1100px) {
   .settingsPage { min-width: 0; }
@@ -1159,3 +1254,1527 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
   .detailGrid { grid-template-columns: minmax(620px, 1fr); }
   .recentActivity { max-width: 420px; }
 }
+
+/* Hybrid theme layer: semantic foundations plus compatibility overrides for legacy light values. */
+:root[data-theme='dark'] body,
+:root[data-theme='dark'] #root,
+:root[data-theme='dark'] .appShell,
+:root[data-theme='dark'] .content,
+:root[data-theme='dark'] .sidebar { color: var(--text-primary); background-color: var(--app-background); }
+
+:root[data-theme='dark'] :where(.searchButton, .folderCreateRow, .profileGroup, .settingsGroup, .apiKeysGroup, .billingConfirmModal, .subscriptionDrawer, .newFolderModal, .settingsReviewModal, .deleteItemContent, .settingsDeleteModal > div, .settingsUtilityContent, .activityModal, .infoModal, .previewMain, .previewLoadState, .previewDocument, .detailMain, .recentActivity, .uploadPanel) {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  background-color: var(--surface-primary);
+}
+
+:root[data-theme='dark'] :where(.profileGroup, .settingsGroup, .apiKeysGroup, .billingConfirmModal, .newFolderModal, .settingsReviewModal) > header,
+:root[data-theme='dark'] :where(.billingInvoiceHeader, .invoiceFooter, .subscriptionAction, .billingPaymentEmpty, .billingSectionFooter, .billingDetailsSummaryAction, .profilePasswordForm, .settingsMobileNav, .detailHeader, .activityHeader, .previewHeader) {
+  color: var(--text-primary);
+  border-color: var(--border-default);
+  background-color: var(--surface-tertiary);
+}
+
+:root[data-theme='dark'] :where(.profileRow, .settingsRow, .billingPlanSummary, .billingUsageHeading, .billingPaymentCard, .receiptPrimary, .receiptRecipients, .billingDetailsSummary > div, .billingInvoiceRow, .subscriptionSummary, .subscriptionFacts, .subscriptionFacts > div, .billingCancelPlan, .detailRow, .activityRow) {
+  border-color: var(--border-default);
+  background-color: transparent;
+}
+
+:root[data-theme='dark'] :where(input, textarea, select, .billingSelect, .settingsMobileNav, .receiptRecipient) {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  background-color: var(--surface-input);
+}
+
+:root[data-theme='dark'] :where(input, textarea)::placeholder {
+  color: var(--placeholder-text);
+  opacity: 1;
+}
+
+:root[data-theme='dark'] :where(.folderRow.active, .plainButton.active, .accountRow:hover, .accountRow.active, .settingsNav button.active, .settingsNav button:hover, .settingsNav button:focus-visible, .accountSectionNav button.active, .accountSectionNav button:hover, .accountSectionNav button:focus-visible) {
+  background-color: var(--surface-hover);
+}
+
+/* Figma 812:34558 — compact dark shell and file overview. */
+:root[data-theme='dark'] .sidebar { border-right-width: .5px; border-right-color: rgba(255,255,255,.1); }
+:root[data-theme='dark'] .searchButton { border-width: .5px; border-color: rgba(255,255,255,.18); background: #1f1f1f; box-shadow: 0 .5px 1px -1px rgba(0,0,0,.1), inset 0 .5px .5px 1px rgba(0,0,0,.25), inset 0 -.5px .5px 1px rgba(0,0,0,.1); }
+:root[data-theme='dark'] .searchButton input { color: #fff; }
+:root[data-theme='dark'] .searchButton input::placeholder { color: var(--placeholder-text); }
+:root[data-theme='dark'] .tableRow,
+:root[data-theme='dark'] .stats > div { color: #fff; border-width: .5px; border-color: rgba(255,255,255,.1); }
+:root[data-theme='dark'] .tableHead { color: #a3a3a3; background: #292929; }
+:root[data-theme='dark'] .tableRow:not(.tableHead):hover,
+:root[data-theme='dark'] .moreButton:hover,
+:root[data-theme='dark'] .moreButton[aria-expanded='true'] { background: #292929; }
+:root[data-theme='dark'] .badge { color: #a3bfc2; background: #374243; }
+:root:not([data-theme='dark']) .sidebar .icon { filter: brightness(0); }
+:root[data-theme='dark'] .sidebar > :not(.accountMenu) .icon { filter: none; opacity: .82; }
+
+/* Reuse the Figma table language across every data surface. */
+:root[data-theme='dark'] :where(.apiTableHead, .detailTableHead, .billingInvoiceHeader) {
+  height: 26px;
+  color: #a3a3a3;
+  border-width: .5px;
+  border-color: rgba(255,255,255,.1);
+  background: #292929;
+}
+:root[data-theme='dark'] :where(.apiKeySummary, .apiKeyValue, .detailRow, .billingInvoiceRow) {
+  color: #fff;
+  border-color: rgba(255,255,255,.1);
+  background: #1f1f1f;
+}
+:root[data-theme='dark'] :where(.apiKeySummary, .apiKeyValue, .detailRow.selectable, .billingInvoiceRow) { transition: background-color 100ms ease; }
+:root[data-theme='dark'] :where(.apiKeySummary:hover, .apiKeyValue:hover, .detailRow.selectable:hover, .detailRow.selectable.selected, .billingInvoiceRow:hover) { background: #292929; }
+:root[data-theme='dark'] .billingPage .billingInvoiceRow > :where(span, strong) { color: #fff; }
+:root[data-theme='dark'] .billingPage .billingInvoiceRow small { color: #a3a3a3; }
+:root[data-theme='dark'] .billingComparisonWrap tbody tr:hover { background: #292929; }
+
+/* Folder detail follows the same dark table standard without a filled breadcrumb bar. */
+:root[data-theme='dark'] .detailHeader {
+  width: calc(80% - 12.8px);
+  color: #fff;
+  border: 0;
+  background: transparent;
+}
+:root[data-theme='dark'] .breadcrumb button,
+:root[data-theme='dark'] .breadcrumb > span:first-of-type,
+:root[data-theme='dark'] .uploadActions { color: #a3a3a3; }
+:root[data-theme='dark'] .breadcrumb > span:last-child,
+:root[data-theme='dark'] .uploadButton { color: #fff; }
+:root[data-theme='dark'] .uploadButton .icon { filter: brightness(0) invert(1); opacity: .82; }
+:root[data-theme='dark'] .previewLayout .detailHeader { width: 100%; }
+:root[data-theme='dark'] .detailTableHead {
+  height: 26px;
+  color: #a3a3a3;
+  border: .5px solid rgba(255,255,255,.1);
+  border-radius: 4px 4px 0 0;
+  background: #292929;
+}
+:root[data-theme='dark'] .detailRow:not(.detailTableHead) {
+  color: #fff;
+  border-width: 0 .5px .5px;
+  border-style: solid;
+  border-color: rgba(255,255,255,.1);
+  background: #1f1f1f;
+}
+:root[data-theme='dark'] .detailRow.selectable:hover,
+:root[data-theme='dark'] .detailRow.selectable.selected { background: #292929; }
+:root[data-theme='dark'] .detailRow .moreButton .icon { filter: none; opacity: .82; }
+:root[data-theme='dark'] .viewTabs { border-color: rgba(255,255,255,.1); background: #292929; box-shadow: none; }
+:root[data-theme='dark'] .viewTabs button { color: #a3a3a3; }
+:root[data-theme='dark'] .viewTabs button.active { color: #fff; border-color: rgba(255,255,255,.1); background: #1f1f1f; box-shadow: inset 0 .5px .5px rgba(255,255,255,.1),inset 0 -.5px .5px rgba(0,0,0,.5); }
+:root[data-theme='dark'] .fileGridCard { color: #fff; }
+:root[data-theme='dark'] .fileGridCard:hover,
+:root[data-theme='dark'] .fileGridCard.selected { background: #292929; }
+:root[data-theme='dark'] .recentActivity h2,
+:root[data-theme='dark'] .activityTop { color: #fff; }
+:root[data-theme='dark'] .activityBody p,
+:root[data-theme='dark'] .activityTop time { color: #a3a3a3; }
+
+/* The updated Figma intentionally keeps the account menu as a light floating surface. */
+:root[data-theme='dark'] .accountMenu,
+:root[data-theme='dark'] .appearanceSubmenu {
+  color: #141414;
+  border-color: rgba(0,0,0,.2);
+  background: linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.2)),#e0e0e0;
+  box-shadow: 0 1px 2px -1px #000,0 2px 4px -2px rgba(0,0,0,.2),0 4px 8px -4px rgba(0,0,0,.5),0 8px 12px -4px rgba(0,0,0,.1),inset 0 .5px .5px rgba(255,255,255,.25),inset 0 -.5px .5px rgba(0,0,0,.1);
+}
+:root[data-theme='dark'] .accountIdentity span { color: #525252; }
+:root[data-theme='dark'] .accountPlan { color: #141414; border-color: rgba(0,0,0,.1); background: linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.1)),#fff; }
+:root[data-theme='dark'] .accountPlanHeading > span,
+:root[data-theme='dark'] .accountUsageMeta { color: #141414; }
+:root[data-theme='dark'] .accountUsageTrack { background: rgba(0,0,0,.1); }
+:root[data-theme='dark'] .accountUsageTrack > span { background: #3d3d3d; }
+:root[data-theme='dark'] .accountUsageMeta button { filter: brightness(0); }
+:root[data-theme='dark'] .accountMenuGroup button:hover,
+:root[data-theme='dark'] .accountMenuGroup button:focus-visible,
+:root[data-theme='dark'] .appearanceSubmenu button.selected { border-color: rgba(0,0,0,.1); background: rgba(0,0,0,.06); }
+:root[data-theme='dark'] .appearanceSubmenu:has(button:hover) button.selected:not(:hover),
+:root[data-theme='dark'] .appearanceSubmenu:has(button:focus-visible) button.selected:not(:focus-visible) { border-color: transparent; background: transparent; }
+:root[data-theme='dark'] .accountMenuFooter { border-top-color: rgba(0,0,0,.15); }
+:root[data-theme='dark'] .accountMenuValue { color: #525252; }
+:root[data-theme='dark'] .accountMenuValue > span { color: #141414; }
+:root[data-theme='dark'] :where(.accountMenu, .appearanceSubmenu) .appearanceThemeIcon,
+:root[data-theme='dark'] :where(.accountMenu, .appearanceSubmenu) .appearanceMenuLabel img { filter: none; opacity: .82; }
+
+:root[data-theme='dark'] :where(.profileRow small, .settingsRowLabel small, .billingPage small, .apiKeysPage small, .accountPage small, .settingsStaticValue, .invoiceFooter, .subscriptionPrice span, .billingDetailsSummary span, .receiptRecipients small) {
+  color: var(--text-muted);
+}
+
+:root[data-theme='dark'] :where(.billingComparisonWrap thead th, .billingComparisonWrap th, .billingComparisonWrap td, .billingInvoiceHeader, .billingInvoiceRow) {
+  color: var(--text-primary);
+  border-color: var(--border-default);
+}
+
+:root[data-theme='dark'] :where(.billingComparisonWrap thead th, .billingInvoiceHeader) { background-color: var(--surface-secondary); }
+:root[data-theme='dark'] :where(.billingComparisonWrap table, .billingInvoiceTable) { background-color: var(--surface-primary); }
+
+:root[data-theme='dark'] :where(.billingConfirmModal > footer, .subscriptionDrawer > header, .billingConfirmModal > header, .addCardDialog form > footer) {
+  color: var(--text-primary);
+  border-color: var(--border-default);
+  background-color: var(--surface-secondary);
+}
+
+:root[data-theme='dark'] :where(.billingConfirmModal button, .billingConfirmModal > footer button, .drawerConfirm > footer button, .addCardDialog form > footer button, .invoiceFooter button) {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  background-color: var(--surface-input);
+}
+
+:root[data-theme='dark'] :where(.settingsToggleTrack, .settingsStorageTrack, .accountUsageTrack) { border-color: var(--border-default); background-color: #343434; }
+:root[data-theme='dark'] :where(.settingsToggleThumb) { background-color: #777; }
+
+:root[data-theme='dark'] :where(.profileDanger > header, .settingsGroup.danger > header) { background-color: #321b1e; }
+:root[data-theme='dark'] :where(.profileDanger, .settingsGroup.danger) { border-color: rgba(229,29,49,.5); }
+:root[data-theme='dark'] :where(.billingDowngradeNotice, .subscriptionCancellationNotice) { background-color: #302819; }
+
+:root[data-theme='dark'] :where(.content .icon, .content .settingsIcon, .sidebar > :not(.accountMenu) .icon, .billingPage img:not([src*='visa']):not([src*='avatar']), .accountPage img:not([src*='avatar'])) {
+  filter: brightness(0) invert(1);
+  opacity: .82;
+}
+
+:root[data-theme='dark'] :where(.organizationMenu, .accountMenu, .appearanceSubmenu, .settingsSelectMenu, .detailRowMenu, .editorGroup, .editorHeadingMenu, .editorColorMenu, .editorLinkMenu) img { filter: none; opacity: 1; }
+
+:root[data-theme='dark'] :where(.billingModalBackdrop, .subscriptionDrawerBackdrop, .newFolderBackdrop, .activityModalBackdrop) { background-color: rgba(0,0,0,.56); }
+:root[data-theme='dark'] :where(.billingConfirmModal, .subscriptionDrawer, .newFolderModal, .settingsReviewModal, .activityModal, .infoModal) { box-shadow: 0 18px 50px var(--shadow-color); }
+
+:root[data-theme='dark'] ::selection { color: #fff; background: #456b70; }
+
+/* One selected-navigation standard across the dark application shell. */
+:root[data-theme='dark'] .sidebar .folderRow.active,
+:root[data-theme='dark'] .sidebar .utilityLinks .plainButton.active,
+:root[data-theme='dark'] .sidebar .accountRow.active,
+:root[data-theme='dark'] .settingsNav button.active,
+:root[data-theme='dark'] .accountSectionNav button.active,
+:root[data-theme='dark'] .viewTabs button.active,
+:root[data-theme='dark'] .searchFilters button.active,
+:root[data-theme='dark'] .billingCycleSwitch button.active {
+  color: #fff;
+  background: #292929;
+}
+:root[data-theme='dark'] .sidebar .folderRow:hover,
+:root[data-theme='dark'] .sidebar .utilityLinks .plainButton:hover,
+:root[data-theme='dark'] .sidebar .accountRow:hover,
+:root[data-theme='dark'] .settingsNav button:hover,
+:root[data-theme='dark'] .accountSectionNav button:hover,
+:root[data-theme='dark'] .viewTabs button:hover,
+:root[data-theme='dark'] .searchFilters button:hover { background: #292929; }
+
+/* Keep the API key composer within the same dark field system as sidebar search. */
+:root[data-theme='dark'] .apiNameField input,
+:root[data-theme='dark'] .apiSelect {
+  color: #fff;
+  background: #1f1f1f;
+  border: 0.5px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 0.5px 1px -1px rgba(0, 0, 0, 0.1),
+    inset 0 0.5px 0.5px 1px rgba(0, 0, 0, 0.25),
+    inset 0 -0.5px 0.5px 1px rgba(0, 0, 0, 0.1);
+}
+
+:root[data-theme='dark'] .apiNameField input::placeholder,
+:root[data-theme='dark'] .apiSelectTrigger .placeholder {
+  color: var(--placeholder-text);
+}
+
+:root[data-theme='dark'] .editorLinkMenu input::placeholder {
+  color: var(--placeholder-text);
+  opacity: 1;
+}
+
+:root[data-theme='dark'] .apiSelectTrigger {
+  color: #fff;
+}
+
+:root[data-theme='dark'] .apiSelectTrigger img {
+  filter: brightness(0) invert(1);
+  opacity: 0.82;
+}
+
+:root[data-theme='dark'] .apiKeyHint {
+  color: #a3a3a3;
+}
+
+:root[data-theme='dark'] .createApiKey {
+  color: #fff;
+}
+
+:root[data-theme='dark'] .createApiKey img {
+  filter: brightness(0) invert(1);
+  opacity: 0.82;
+}
+
+:root[data-theme='dark'] .createApiKey:disabled {
+  color: #a3a3a3;
+}
+
+:root[data-theme='dark'] .createApiKey:disabled img {
+  opacity: 0.45;
+}
+
+/* Dark-theme page audit — approved Figma 812:35358 component standard. */
+:root[data-theme='dark'] .accountMenu,
+:root[data-theme='dark'] .appearanceSubmenu {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.2)), #3d3d3d;
+  box-shadow:
+    0 1px 2px -1px rgba(0, 0, 0, 0.25),
+    0 2px 4px -2px rgba(0, 0, 0, 0.2),
+    0 4px 8px -4px rgba(0, 0, 0, 0.15),
+    0 8px 12px -4px rgba(0, 0, 0, 0.1),
+    inset 0 0.5px 0.5px rgba(255, 255, 255, 0.25),
+    inset 0 -0.5px 0.5px rgba(0, 0, 0, 0.1);
+}
+
+:root[data-theme='dark'] .accountIdentity span { color: #c2c2c2; }
+:root[data-theme='dark'] .accountPlan {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent), rgba(255, 255, 255, 0.1);
+}
+:root[data-theme='dark'] .accountPlanHeading > span,
+:root[data-theme='dark'] .accountUsageMeta { color: #fff; }
+:root[data-theme='dark'] .accountUsageTrack { background: rgba(255, 255, 255, 0.16); }
+:root[data-theme='dark'] .accountUsageTrack > span { background: #fff; }
+:root[data-theme='dark'] .accountUsageMeta button { filter: none; }
+:root[data-theme='dark'] .accountUsageMeta button .icon {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+}
+:root[data-theme='dark'] .accountMenuValue { color: #c2c2c2; }
+:root[data-theme='dark'] .accountMenuValue > span { color: #fff; }
+:root[data-theme='dark'] .accountMenuGroup button:hover,
+:root[data-theme='dark'] .accountMenuGroup button:focus-visible,
+:root[data-theme='dark'] .appearanceSubmenu button.selected {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent), rgba(255, 255, 255, 0.1);
+}
+:root[data-theme='dark'] .accountMenuFooter { border-top-color: rgba(255, 255, 255, 0.12); }
+:root[data-theme='dark'] .appearanceCheck { color: #fff; }
+:root[data-theme='dark'] :where(.accountMenu, .appearanceSubmenu) .appearanceThemeIcon,
+:root[data-theme='dark'] :where(.accountMenu, .appearanceSubmenu) .appearanceMenuLabel img {
+  filter: brightness(0) invert(1);
+  opacity: 0.82;
+}
+
+/* Page cards, forms and summaries. */
+:root[data-theme='dark'] :where(
+  .profileGroup,
+  .settingsGroup,
+  .apiKeysGroup,
+  .billingPlanCard,
+  .billingComparisonWrap,
+  .billingInvoiceTable,
+  .billingDetailsSummary,
+  .previewCard,
+  .previewToolbar,
+  .previewDocument,
+  .previewLoadState
+) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #1f1f1f;
+}
+
+:root[data-theme='dark'] :where(
+  .profileGroup > header,
+  .settingsGroup > header,
+  .apiKeysGroup > header,
+  .billingPage .billingInvoiceHeader,
+  .tableHead,
+  .detailTableHead,
+  .apiTableHead
+) {
+  color: #a3a3a3;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #292929;
+}
+
+:root[data-theme='dark'] :where(
+  .profileRow,
+  .settingsRow,
+  .billingPlanSummary,
+  .billingPaymentCard,
+  .receiptPrimary,
+  .receiptRecipients,
+  .billingDetailsSummary > div
+) { border-color: rgba(255, 255, 255, 0.1); }
+
+:root[data-theme='dark'] :where(
+  .profileField input,
+  .profilePasswordForm input,
+  .workspaceNameControl input,
+  .billingSelect,
+  .billingDetailsForm input,
+  .billingDetailsForm select,
+  .receiptPrimary input,
+  .receiptAdd input,
+  .billingPage .receiptAddField,
+  .addCardDialog input,
+  .editorLinkMenu input
+) {
+  color: #fff;
+  border: 0.5px solid rgba(255, 255, 255, 0.18);
+  background: #1f1f1f;
+  box-shadow:
+    0 0.5px 1px -1px rgba(0, 0, 0, 0.1),
+    inset 0 0.5px 0.5px rgba(0, 0, 0, 0.25),
+    inset 0 -0.5px 0.5px rgba(0, 0, 0, 0.1);
+}
+
+:root[data-theme='dark'] :where(
+  .profilePhotoControl button,
+  .profileActionWithIcon,
+  .billingInlineAction,
+  .billingPage .subscriptionUpgrade,
+  .billingPage .receiptSendTest,
+  .billingPage .receiptAddField > button,
+  .drawerBody .enterpriseBanner button,
+  .uploadButton
+) { color: #fff; }
+
+:root[data-theme='dark'] :where(
+  .profileRow small,
+  .profilePasswordForm label,
+  .billingPlanSummary small,
+  .billingPlanAction small,
+  .billingUsageHeading small,
+  .billingUsageHeading em,
+  .billingEmptyState small,
+  .billingPlanPrice span,
+  .billingStaticValue,
+  .billingPage .billingUsageFooter,
+  .receiptValueMain > span,
+  .receiptRecipientMain > span,
+  .settingsRowLabel small,
+  .settingsStaticValue
+) { color: var(--text-secondary); }
+
+/* Billing plan, invoice and receipt interaction states. */
+:root[data-theme='dark'] .billingCycleSwitch {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #292929;
+}
+:root[data-theme='dark'] .billingCycleSwitch button { color: #a3a3a3; }
+:root[data-theme='dark'] .billingCycleSwitch button.active { color: #fff; background: #1f1f1f; }
+:root[data-theme='dark'] .billingPlanCard:hover,
+:root[data-theme='dark'] .billingPlanCard.recommended { border-color: rgba(157, 192, 196, 0.75); }
+:root[data-theme='dark'] .billingPlanCard li strong,
+:root[data-theme='dark'] .billingPage .billingUsageHeading > span,
+:root[data-theme='dark'] .billingPage .billingDetailsSummary strong { color: #fff; }
+:root[data-theme='dark'] .billingUsageInsight button,
+:root[data-theme='dark'] .billingInvoiceRow button,
+:root[data-theme='dark'] .invoiceFooter button,
+:root[data-theme='dark'] .billingFormActions .secondary {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: #1f1f1f;
+}
+:root[data-theme='dark'] .billingPage .receiptAddField { background: #1f1f1f; }
+:root[data-theme='dark'] .billingPage .billingInvoiceRow {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #1f1f1f;
+}
+:root[data-theme='dark'] .billingPage .billingInvoiceRow:hover { background: #292929; }
+:root[data-theme='dark'] .billingPage .billingInvoiceRow > span,
+:root[data-theme='dark'] .billingPage .billingInvoiceRow > strong { color: #fff; }
+:root[data-theme='dark'] .paymentDefaultBadge,
+:root[data-theme='dark'] .apiStatusBadge.revoked { color: #a3a3a3; background: #292929; }
+:root[data-theme='dark'] .billingCancelPlan > button,
+:root[data-theme='dark'] .subscriptionActionButtons .cancelSubscriptionButton {
+  color: #ff5a68;
+  border-color: rgba(255, 90, 104, 0.65);
+  background: transparent;
+}
+:root[data-theme='dark'] .billingCancelPlan > button:hover,
+:root[data-theme='dark'] .subscriptionActionButtons .cancelSubscriptionButton:hover { background: rgba(229, 29, 49, 0.12); }
+
+/* Dialogs and overlays use the same two-surface hierarchy as the page. */
+:root[data-theme='dark'] :where(
+  .newFolderModal,
+  .deleteItemModal,
+  .activityModal,
+  .subscriptionDrawer
+) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: #292929;
+}
+:root[data-theme='dark'] :where(
+  .newFolderModal form,
+  .deleteItemContent,
+  .settingsDeleteModal > div,
+  .settingsUtilityContent,
+  .settingsReviewModal,
+  .apiRevokeContent,
+  .activityModalBody,
+  .drawerBody,
+  .drawerPlanCard,
+  .billingConfirmModal,
+  .addCardDialog
+) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #1f1f1f;
+}
+:root[data-theme='dark'] :where(
+  .newFolderModal input,
+  .newFolderModal .addFolderButton,
+  .billingConfirmModal > footer button,
+  .drawerConfirm > footer button,
+  .addCardDialog form > footer button
+) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: #1f1f1f;
+}
+:root[data-theme='dark'] :where(
+  .deleteItemContent footer button,
+  .settingsDeleteModal p,
+  .settingsDeleteModal > div button,
+  .settingsUtilityContent p,
+  .settingsReviewModal header p,
+  .settingsReviewModal footer button,
+  .apiRevokeContent p,
+  .apiRevokeActions button,
+  .activityMetrics span:first-child,
+  .modalActivityItem time
+) { color: #a3a3a3; }
+:root[data-theme='dark'] :where(
+  .newFolderBackdrop,
+  .deleteItemBackdrop,
+  .settingsReviewBackdrop,
+  .billingModalBackdrop,
+  .subscriptionDrawerBackdrop,
+  .activityModalBackdrop,
+  .dropOverlay
+) { background: rgba(0, 0, 0, 0.56); }
+
+/* API states and content-preview surfaces. */
+:root[data-theme='dark'] .apiKeysEmptyState > div { color: #fff; }
+:root[data-theme='dark'] .apiKeyValue { color: #a3a3a3; }
+:root[data-theme='dark'] .apiStatusBadge.expiring-soon,
+:root[data-theme='dark'] .billingPage .billingInvoiceRow em.refunded { color: #f2b84b; background: #302819; }
+:root[data-theme='dark'] .apiStatusBadge.expired { color: #ff7a86; background: #321b1e; }
+:root[data-theme='dark'] .previewToolbar,
+:root[data-theme='dark'] .previewDocument,
+:root[data-theme='dark'] .previewLoadState { border-color: rgba(255, 255, 255, 0.1); }
+:root[data-theme='dark'] .previewCard { box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.1); }
+:root[data-theme='dark'] .activityHistory { border-color: rgba(255, 255, 255, 0.1); }
+:root[data-theme='dark'] .drawerPlanCard { border-right-color: rgba(255, 255, 255, 0.1); }
+:root[data-theme='dark'] .drawerPlanCard > p { color: var(--text-secondary); }
+:root[data-theme='dark'] .drawerPlanPrice span { color: #fff; }
+:root[data-theme='dark'] .drawerBody .enterpriseBanner {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #292929;
+}
+:root[data-theme='dark'] .drawerBody .enterpriseBanner p { color: #fff; }
+
+/* Preserve semantic danger surfaces without reintroducing white panels. */
+:root[data-theme='dark'] .settingsGroup.danger { border-color: rgba(229, 29, 49, 0.5); background: #1f1f1f; }
+:root[data-theme='dark'] .settingsGroup.danger > header,
+:root[data-theme='dark'] .profileDanger > header { border-color: rgba(229, 29, 49, 0.5); background: #321b1e; }
+:root[data-theme='dark'] .settingsGroup.danger .settingsRow { background: #1f1f1f; }
+:root[data-theme='dark'] .settingsDangerButton { color: #ff5a68; background: transparent; }
+:root[data-theme='dark'] .settingsGroup.danger .settingsRowLabel small { color: var(--text-secondary); }
+:root[data-theme='dark'] .settingsDangerButton .settingsIcon {
+  filter: none;
+  opacity: 1;
+}
+:root[data-theme='dark'] .profileGroup.profileDanger {
+  border-color: rgba(229, 29, 49, 0.5);
+}
+:root[data-theme='dark'] .profileDanger .profileRow {
+  border-color: rgba(229, 29, 49, 0.5);
+  background: #1f1f1f;
+}
+:root[data-theme='dark'] .profileDanger .profileRow small { color: var(--text-secondary); }
+:root[data-theme='dark'] .profileDelete {
+  height: 30px;
+  color: #ff5a68;
+  background: transparent;
+}
+:root[data-theme='dark'] .profileDelete img {
+  filter: none;
+  opacity: 1;
+}
+:root[data-theme='dark'] :where(.settingsDataError, .settingsReviewError, .apiRevokeContent .apiRevokeError) {
+  color: #ff7a86;
+  background: #321b1e;
+}
+
+/* Secondary strips, badges and disabled states found during the second pass. */
+:root[data-theme='dark'] :where(
+  .profilePasswordForm,
+  .billingPlanAction,
+  .billingUsageInsight,
+  .subscriptionAction,
+  .billingPaymentEmpty,
+  .billingSectionFooter,
+  .billingDetailsSummaryAction,
+  .invoiceFooter,
+  .cancelSubscriptionBody > div
+) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #292929;
+}
+:root[data-theme='dark'] .billingUsageTrack { background: #343434; }
+:root[data-theme='dark'] :where(
+  .billingInvoices > header span,
+  .currentPlanBadge,
+  .profileLabelWithStatus em.off
+) { color: #a3a3a3; background: #292929; }
+:root[data-theme='dark'] :where(.billingRecommendation > span, .recommendedBadge) {
+  color: #a3bfc2;
+  background: #374243;
+}
+:root[data-theme='dark'] .billingPlanCard.current { background: #1f1f1f; }
+:root[data-theme='dark'] :where(.currentButton, .drawerPlanCard > button:disabled) {
+  color: #a3a3a3;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #292929;
+}
+:root[data-theme='dark'] :where(.receiptValue, .billingPage .receiptRecipient) {
+  color: #fff;
+  background: #292929;
+}
+:root[data-theme='dark'] .billingConfirmBody dl div { border-color: rgba(255, 255, 255, 0.1); }
+:root[data-theme='dark'] .billingConfirmBody dt { color: #a3a3a3; }
+:root[data-theme='dark'] .billingConfirmBody dd { color: #fff; }
+:root[data-theme='dark'] .settingsMobileNav {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: #1f1f1f;
+}
+:root[data-theme='dark'] .organizationAvatar { border-color: rgba(255, 255, 255, 0.1); background: #292929; }
+:root[data-theme='dark'] .sidebar .folderCreateRow .icon {
+  filter: brightness(0) invert(1);
+  opacity: 0.82;
+}
+:root[data-theme='dark'] .sidebar.collapsed .searchButton .icon {
+  filter: none;
+  opacity: 1;
+}
+
+/* Figma 816:36795 / 816:36798 — shared success and neutral status pills. */
+:root[data-theme='dark'] :where(
+  .profileLabelWithStatus em,
+  .apiStatusBadge,
+  .billingPage .billingInvoiceRow em,
+  .paymentDefaultBadge,
+  .currentPlanBadge,
+  .activityBadge,
+  .shareBadge
+) {
+  display: inline-flex;
+  min-height: 18px;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-style: normal;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+:root[data-theme='dark'] :where(
+  .profileLabelWithStatus em:not(.off),
+  .apiStatusBadge.active,
+  .billingPage .billingInvoiceRow em.paid
+) {
+  color: var(--status-success-text);
+  background: var(--status-success-background);
+}
+
+:root[data-theme='dark'] :where(
+  .profileLabelWithStatus em.off,
+  .apiStatusBadge.revoked,
+  .paymentDefaultBadge,
+  .currentPlanBadge,
+  .activityBadge,
+  .shareBadge
+) {
+  color: var(--status-neutral-text);
+  background: var(--status-neutral-background);
+}
+
+/* Keep the legacy .off rule from overriding the shared neutral token. */
+:root[data-theme='dark'] .profileLabelWithStatus em.off {
+  color: var(--status-neutral-text);
+  background: var(--status-neutral-background);
+}
+:root[data-theme='dark'] .billingPage .billingInvoiceRow em.paid {
+  color: var(--status-success-text);
+  background: var(--status-success-background);
+}
+:root[data-theme='dark'] .billingPage .receiptAddField > button {
+  color: #fff;
+}
+:root[data-theme='dark'] .billingPage .receiptAddField > button img {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+}
+
+/* Floating account menus stay dark in both application themes. */
+.accountMenu,
+.appearanceSubmenu {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.2)), #3d3d3d;
+  box-shadow:
+    0 1px 2px -1px rgba(0, 0, 0, 0.25),
+    0 2px 4px -2px rgba(0, 0, 0, 0.2),
+    0 4px 8px -4px rgba(0, 0, 0, 0.15),
+    0 8px 12px -4px rgba(0, 0, 0, 0.1),
+    inset 0 0.5px 0.5px rgba(255, 255, 255, 0.25),
+    inset 0 -0.5px 0.5px rgba(0, 0, 0, 0.1);
+}
+.accountIdentity span { color: #ccc; }
+.accountPlan {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent), rgba(255, 255, 255, 0.1);
+}
+.accountPlanHeading > span,
+.accountUsageMeta { color: #fff; }
+.accountUsageTrack { background: rgba(255, 255, 255, 0.16); }
+.accountUsageTrack > span { background: #fff; }
+.accountUsageMeta button .icon { filter: brightness(0) invert(1); opacity: 1; }
+.accountMenuValue { color: #ccc; }
+.accountMenuValue > span { color: #fff; }
+.accountMenuGroup button:hover,
+.accountMenuGroup button:focus-visible,
+.appearanceSubmenu button.selected {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent), rgba(255, 255, 255, 0.1);
+}
+.accountMenuFooter { border-top-color: rgba(255, 255, 255, 0.12); }
+.appearanceCheck { color: #fff; }
+.appearanceThemeIcon { filter: brightness(0) invert(1); opacity: 0.82; }
+.organizationMenu .organizationOption > .icon:last-child {
+  filter: none;
+  opacity: 1;
+}
+:root:not([data-theme='dark']) .sidebar .workspaceName > .icon {
+  filter: brightness(0);
+  opacity: 1;
+}
+:root[data-theme='dark'] .sidebar .workspaceName > .icon {
+  filter: none;
+  opacity: 0.82;
+}
+:root .sidebar .organizationMenu .organizationOption > .icon:last-child {
+  filter: none;
+  opacity: 1;
+}
+:root .sidebar .organizationMenu .organizationAvatar {
+  border: 0.3px solid rgba(0, 0, 0, 0.08);
+  background: #f5f5f5;
+}
+:root .sidebar .organizationMenu .organizationAvatar .icon {
+  filter: none;
+  opacity: 1;
+}
+
+/* Empty-state copy follows the dark page text hierarchy. */
+:root[data-theme='dark'] :where(.detailEmptyCopy h2, .detailEmptyUpload, .emptyBeamCopy h2, .emptyBeamCreate) {
+  color: #fff;
+}
+:root[data-theme='dark'] :where(.detailEmptyCopy p, .emptyBeamCopy p) {
+  color: var(--text-secondary);
+}
+:root[data-theme='dark'] :where(.detailEmptyUpload, .emptyBeamCreate) .icon {
+  filter: brightness(0) invert(1);
+  opacity: 0.82;
+}
+
+/* Canonical opened-menu treatment — Figma 816:36860.
+   Floating menus intentionally use this dark surface in both app themes. */
+:is(
+  .organizationMenu,
+  .accountMenu,
+  .appearanceSubmenu,
+  .settingsSelectMenu,
+  .apiSelectMenu,
+  .apiRowMenu,
+  .rowMenu,
+  .editorHeadingMenu,
+  .editorColorMenu,
+  .editorLinkMenu,
+  .sharePopoverBody
+) {
+  border: .5px solid rgba(255, 255, 255, .2);
+  border-radius: 6px;
+  color: #fff;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, .2)), #3d3d3d;
+  box-shadow:
+    0 1px 2px -1px rgba(0, 0, 0, .25),
+    0 2px 4px -2px rgba(0, 0, 0, .2),
+    0 4px 8px -4px rgba(0, 0, 0, .15),
+    0 8px 12px -4px rgba(0, 0, 0, .1),
+    inset 0 .5px .5px rgba(255, 255, 255, .25),
+    inset 0 -.5px .5px rgba(0, 0, 0, .1);
+}
+
+.sharePopover { filter: none; }
+.sharePopoverBody { overflow: hidden; }
+.copyNotice { background: #3d3d3d; }
+
+:is(.settingsSelectMenu, .apiSelectMenu, .apiRowMenu, .rowMenu, .editorHeadingMenu) {
+  padding: 2px;
+}
+
+:is(.settingsSelectMenu, .apiSelectMenu, .editorHeadingMenu) button,
+.apiRowMenu button,
+.rowMenu button {
+  min-height: 26px;
+  padding: 4px 6px;
+  border: .5px solid transparent;
+  border-radius: 4px;
+  color: #fff;
+  line-height: 18px;
+}
+
+:is(.settingsSelectMenu, .apiSelectMenu, .editorHeadingMenu) button:is(.selected, .focused, :hover, :focus-visible),
+.apiRowMenu button:is(:hover, :focus-visible),
+.rowMenu button:is(:hover, :focus-visible) {
+  outline: 0;
+  border-color: rgba(255, 255, 255, .1);
+  border-left-color: transparent;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .1), transparent), rgba(255, 255, 255, .1);
+  box-shadow:
+    0 .5px 1px rgba(0, 0, 0, .2),
+    0 1px 2px -1px rgba(0, 0, 0, .1),
+    inset 0 .5px .5px rgba(255, 255, 255, .1),
+    inset 0 -.5px .5px rgba(0, 0, 0, .1);
+}
+
+:is(.settingsSelectMenu, .apiSelectMenu, .editorHeadingMenu):has(button:hover) button.selected:not(:hover),
+:is(.settingsSelectMenu, .apiSelectMenu, .editorHeadingMenu):has(button:focus-visible) button.selected:not(:focus-visible) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+:is(.settingsSelectMenu, .apiSelectMenu, .rowMenu, .editorHeadingMenu) img {
+  filter: none;
+  opacity: 1;
+}
+
+.apiRowMenu { overflow: hidden; }
+.apiRowMenu button { display: flex; align-items: center; text-align: left; }
+
+/* Preserve the compact, content-specific rows from their dedicated designs. */
+.organizationMenu :where(.organizationOption, .accountGroup button) { min-height: 22px; }
+.accountMenuGroup button,
+.appearanceSubmenu button { min-height: 24px; }
+
+.accountMenuGroup button:is(:hover, :focus-visible, .submenuOpen),
+.appearanceSubmenu button:is(:hover, :focus-visible, .selected) {
+  outline: 0;
+  border-color: rgba(255, 255, 255, .1);
+  border-left-color: transparent;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .1), transparent), rgba(255, 255, 255, .1);
+  box-shadow:
+    0 .5px 1px rgba(0, 0, 0, .2),
+    0 1px 2px -1px rgba(0, 0, 0, .1),
+    inset 0 .5px .5px rgba(255, 255, 255, .1),
+    inset 0 -.5px .5px rgba(0, 0, 0, .1);
+}
+
+.accountMenuGroup:has(button:hover) button.submenuOpen:not(:hover),
+.accountMenuGroup:has(button:focus-visible) button.submenuOpen:not(:focus-visible),
+.appearanceSubmenu:has(button:hover) button.selected:not(:hover),
+.appearanceSubmenu:has(button:focus-visible) button.selected:not(:focus-visible) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Opened file preview — dark theme only. Keep the light preview unchanged. */
+:root[data-theme='dark'] .filePreview {
+  color: #fff;
+  border-left-color: rgba(255, 255, 255, .1);
+  background: #141414;
+}
+
+:root[data-theme='dark'] .previewTitle {
+  color: #fff;
+}
+
+:root[data-theme='dark'] :is(.previewTitle, .previewActions, .previewLoadState) .icon {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+}
+
+:root[data-theme='dark'] .previewCard,
+:root[data-theme='dark'] .previewToolbar,
+:root[data-theme='dark'] .previewDocument,
+:root[data-theme='dark'] .previewLoadState {
+  color: #fff;
+  border-color: rgba(255, 255, 255, .1);
+  background: #1f1f1f;
+}
+
+:root[data-theme='dark'] .previewCard {
+  box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .1);
+}
+
+:root[data-theme='dark'] .previewDocument :is(h1, h2, p, li, strong) {
+  color: inherit;
+}
+
+:root[data-theme='dark'] .previewDocument ::selection {
+  color: #fff;
+  background: #3d3d3d;
+}
+
+:root[data-theme='dark'] .paneHandle {
+  color: #fff;
+  border-color: rgba(255, 255, 255, .1);
+  background: #292929;
+}
+
+:root[data-theme='dark'] .paneHandle .icon {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+}
+
+/* File deletion alert — Figma 817:37914, dark theme only. */
+:root[data-theme='dark'] .deleteItemBackdrop {
+  padding: 24px;
+  background: rgba(0, 0, 0, .56);
+  backdrop-filter: blur(2.5px);
+  -webkit-backdrop-filter: blur(2.5px);
+}
+
+:root[data-theme='dark'] .deleteItemModal {
+  width: min(480.39px, calc(100vw - 48px));
+  max-height: min(620px, calc(100vh - 48px));
+  border: .5px solid rgba(255, 255, 255, .1);
+  border-radius: 8px;
+  color: #fff;
+  background: #1f1f1f;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, .1),
+    0 4px 8px -4px rgba(0, 0, 0, .08),
+    0 6px 12px -6px rgba(0, 0, 0, .06),
+    0 8px 16px -6px rgba(0, 0, 0, .04),
+    inset 0 -.5px .5px rgba(0, 0, 0, .1);
+}
+
+:root[data-theme='dark'] .deleteItemModal > header {
+  padding: 8px 8px 8px 12px;
+  color: #fff;
+  background: #1f1f1f;
+}
+
+:root[data-theme='dark'] .deleteItemModal header > button img {
+  width: 8.5px;
+  height: 8.5px;
+}
+
+:root[data-theme='dark'] .deleteItemContent {
+  height: 149px;
+  gap: 40px;
+  padding: 12px;
+  border: 0;
+  border-top: .5px solid rgba(255, 255, 255, .1);
+  border-radius: 6px;
+  color: #fff;
+  background: #292929;
+  box-shadow:
+    0 -2px 20px -6px rgba(0, 0, 0, .5),
+    inset 0 -.5px .5px rgba(0, 0, 0, .1);
+}
+
+:root[data-theme='dark'] .deleteItemContent p { color: #fff; }
+:root[data-theme='dark'] .deleteItemContent footer { gap: 20px; }
+:root[data-theme='dark'] .deleteItemContent footer button { color: #a3a3a3; }
+:root[data-theme='dark'] .deleteItemContent footer .deleteItemConfirm { color: #f13546; }
+
+/* Shared dark modal language derived from the deletion alert. */
+:root[data-theme='dark'] :is(
+  .newFolderBackdrop,
+  .settingsReviewBackdrop,
+  .billingModalBackdrop,
+  .subscriptionDrawerBackdrop,
+  .activityModalBackdrop
+) {
+  background: rgba(0, 0, 0, .56);
+  backdrop-filter: blur(2.5px);
+  -webkit-backdrop-filter: blur(2.5px);
+}
+
+:root[data-theme='dark'] :is(
+  .newFolderModal,
+  .settingsReviewModal,
+  .billingConfirmModal,
+  .subscriptionDrawer,
+  .activityModal
+) {
+  border: .5px solid rgba(255, 255, 255, .1);
+  border-radius: 8px;
+  color: #fff;
+  background: #1f1f1f;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, .1),
+    0 4px 8px -4px rgba(0, 0, 0, .08),
+    0 6px 12px -6px rgba(0, 0, 0, .06),
+    0 8px 16px -6px rgba(0, 0, 0, .04),
+    inset 0 -.5px .5px rgba(0, 0, 0, .1);
+}
+
+:root[data-theme='dark'] :is(
+  .newFolderModal > header,
+  .billingConfirmModal > header,
+  .subscriptionDrawer > header,
+  .activityModalHeader
+) {
+  color: #fff;
+  border-bottom: 0;
+  background: #1f1f1f;
+}
+
+:root[data-theme='dark'] :is(
+  .newFolderModal form,
+  .settingsDeleteModal > div,
+  .settingsUtilityContent,
+  .apiRevokeContent,
+  .cancelSubscriptionBody,
+  .addCardDialog form,
+  .drawerBody,
+  .activityModalBody
+) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, .1);
+  background: #292929;
+  box-shadow:
+    0 -2px 20px -6px rgba(0, 0, 0, .5),
+    inset 0 -.5px .5px rgba(0, 0, 0, .1);
+}
+
+:root[data-theme='dark'] :is(
+  .newFolderModal header,
+  .settingsReviewModal header,
+  .billingConfirmModal header,
+  .subscriptionDrawer header,
+  .activityModalHeader
+) button img,
+:root[data-theme='dark'] :is(.activityModalHeader, .newFolderModal header) .icon {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+}
+
+/* The activity dialog keeps its content-specific dimensions but uses the shared surfaces. */
+:root[data-theme='dark'] .activityModalBackdrop {
+  padding: 120px 24px;
+}
+
+:root[data-theme='dark'] .activityModalHeader {
+  height: 34px;
+  flex: 0 0 34px;
+  padding: 8px 8px 8px 12px;
+}
+
+:root[data-theme='dark'] .activityModalBody {
+  padding: 8px 12px;
+  border: 0;
+  border-top: .5px solid rgba(255, 255, 255, .1);
+  border-radius: 6px;
+}
+
+:root[data-theme='dark'] .activityMetrics {
+  border-bottom-color: rgba(255, 255, 255, .1);
+}
+
+/* One destructive/error red across the dark theme. Light-theme values stay unchanged. */
+:root[data-theme='dark'] :is(
+  .profileDisconnect,
+  .profileDelete,
+  .settingsDangerButton,
+  .billingPaymentCard .dangerText,
+  .receiptRecipient button,
+  .billingFieldError,
+  .workspaceNameError,
+  .apiNameError,
+  .apiStatusBadge.expired,
+  .apiRevokeActions .dangerModalButton,
+  .settingsDataError,
+  .settingsReviewError,
+  .apiRevokeContent .apiRevokeError,
+  .deleteItemConfirm
+) {
+  color: var(--danger-text);
+}
+
+:root[data-theme='dark'] :is(
+  .billingCancelPlan > button,
+  .subscriptionActionButtons .cancelSubscriptionButton
+) {
+  color: var(--danger-text);
+  border-color: var(--danger-border);
+}
+
+:root[data-theme='dark'] .billingConfirmModal > footer .cancelConfirm {
+  color: #fff;
+  border-color: var(--danger-text);
+  background: var(--danger-text);
+}
+
+:root[data-theme='dark'] :is(
+  .folderCreateRow.invalid,
+  .workspaceNameControl input[aria-invalid='true'],
+  .apiNameField input[aria-invalid='true'],
+  .profileDanger,
+  .profileGroup.profileDanger,
+  .profileDanger .profileRow,
+  .settingsGroup.danger
+) {
+  border-color: var(--danger-border);
+}
+
+:root[data-theme='dark'] :is(.profileDanger > header, .settingsGroup.danger > header) {
+  border-color: var(--danger-border);
+  background: var(--danger-surface);
+}
+
+:root[data-theme='dark'] :is(
+  .apiStatusBadge.expired,
+  .settingsDataError,
+  .settingsReviewError,
+  .apiRevokeContent .apiRevokeError
+) {
+  background: var(--danger-surface);
+}
+
+:root[data-theme='dark'] .folderCreateRow > span {
+  background: var(--danger-text);
+}
+
+/* Recolor legacy trash assets without changing their light-theme SVG files. */
+:root[data-theme='dark'] :is(.settingsDangerButton, .profileDelete)::before {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  background: var(--danger-text);
+  content: '';
+  -webkit-mask: url('/assets/settings-trash.svg') center / 12px 12px no-repeat;
+  mask: url('/assets/settings-trash.svg') center / 12px 12px no-repeat;
+}
+
+:root[data-theme='dark'] :is(.settingsDangerButton .settingsIcon, .profileDelete img) {
+  display: none;
+}
+
+/* The account popover is always dark, so its usage affordance is always white. */
+:root .sidebar .accountMenu .accountUsageMeta button .icon {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+}
+
+/* Refunded status — Figma 817:37957, dark theme only. */
+:root[data-theme='dark'] .billingPage .billingInvoiceRow em.refunded {
+  padding: 1px 5px;
+  border-radius: 999px;
+  color: #efad20;
+  background: #593b05;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+/* Choose your plan — Figma 817:38148, dark theme only. */
+:root[data-theme='dark'] .subscriptionDrawerBackdrop {
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, .56);
+  backdrop-filter: blur(2.5px);
+  -webkit-backdrop-filter: blur(2.5px);
+}
+
+:root[data-theme='dark'] .subscriptionDrawer {
+  width: min(834px, calc(100vw - 48px));
+  height: auto;
+  max-height: min(852px, calc(100dvh - 48px));
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 8px;
+  background: #1f1f1f;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, .1),
+    0 4px 8px -4px rgba(0, 0, 0, .08),
+    0 6px 12px -6px rgba(0, 0, 0, .06),
+    0 8px 16px -6px rgba(0, 0, 0, .04),
+    inset 0 -.5px .5px rgba(0, 0, 0, .1);
+}
+
+:root[data-theme='dark'] .subscriptionDrawer > header {
+  height: 35px;
+  min-height: 35px;
+  padding: 8px 8px 8px 12px;
+  border: 0;
+  color: #fff;
+  background: #1f1f1f;
+}
+
+:root[data-theme='dark'] .subscriptionDrawer > header > div { gap: 6px; }
+:root[data-theme='dark'] .subscriptionDrawer > header h2 { font-size: 12px; line-height: 18px; }
+:root[data-theme='dark'] .subscriptionDrawer .planModalIcon { filter: none; opacity: .82; }
+:root[data-theme='dark'] .subscriptionDrawer .drawerClose img { filter: brightness(0) invert(1); opacity: .56; }
+
+:root[data-theme='dark'] .subscriptionDrawer .drawerBody {
+  display: flex;
+  min-height: 0;
+  flex: none;
+  flex-direction: column;
+  gap: 20px;
+  padding: 12px;
+  overflow-y: auto;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 6px;
+  color: #fff;
+  background: #292929;
+  box-shadow:
+    0 -2px 20px -6px rgba(0, 0, 0, .5),
+    inset 0 -.5px .5px rgba(0, 0, 0, .1);
+}
+
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 0;
+}
+
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanCard {
+  min-width: 0;
+  min-height: 0;
+  padding: 0 12px;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 0;
+  color: #fff;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanCard:first-child { padding-left: 0; }
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanCard:last-child { padding-right: 0; border-right: 0; }
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanCard.recommended { border-color: rgba(255, 255, 255, .1); box-shadow: none; }
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanCard h3 { color: #fff; font-size: 12px; line-height: 18px; }
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanCard > p { min-height: 36px; margin: 0; color: #ccc; line-height: 18px; }
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanPrice { gap: 2px; margin: 32px 0 12px; }
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanPrice strong { color: #fff; font-size: 24px; line-height: 28px; }
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanPrice span { color: #fff; }
+
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanCard > button:not(:disabled) {
+  height: 26px;
+  border: .5px solid rgba(255, 255, 255, .7);
+  border-radius: 4px;
+  color: #0a0a0a;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, .2)), #ebebeb;
+  box-shadow:
+    0 1px 2px rgba(255, 255, 255, .1),
+    0 4px 8px -4px rgba(0, 0, 0, .2),
+    0 2px 20px -6px #000,
+    0 8px 16px -6px rgba(0, 0, 0, .1),
+    inset 0 -.5px .5px rgba(255, 255, 255, .1);
+}
+
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanCard > button:disabled {
+  height: 26px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  color: #fff;
+  background: #3d3d3d;
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanCard ul {
+  gap: 4px;
+  margin: 0;
+  padding: 12px 0 0;
+  border: 0;
+}
+
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanCard ul::before { color: #8f8f8f; }
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanCard li { min-height: 18px; color: #fff; line-height: 18px; }
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanCard li::before { filter: brightness(0) invert(1); opacity: 1; }
+
+:root[data-theme='dark'] .subscriptionDrawer .drawerBody .enterpriseBanner {
+  min-height: 42px;
+  margin: 0;
+  padding: 12px;
+  border: .5px solid rgba(255, 255, 255, .1);
+  border-radius: 6px;
+  color: #fff;
+  background: #1f1f1f;
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .subscriptionDrawer .drawerBody .enterpriseBanner p,
+:root[data-theme='dark'] .subscriptionDrawer .drawerBody .enterpriseBanner button { color: #fff; }
+:root[data-theme='dark'] .subscriptionDrawer .drawerBody .enterpriseBanner button img { filter: brightness(0) invert(1); opacity: 1; }
+
+/* Tooltip — Figma 817:39434. Visual treatment only; geometry remains component-owned. */
+:root[data-theme='dark'] :is(.settingsInfoTooltip > span, .copyNotice, .copyTooltip) {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  color: #fff;
+  background: #3d3d3d;
+  box-shadow:
+    0 1px 2px rgba(255, 255, 255, .1),
+    0 4px 8px rgba(0, 0, 0, .2),
+    0 2px 10px rgba(0, 0, 0, .2),
+    0 8px 16px rgba(0, 0, 0, .1),
+    inset 0 -.5px .5px rgba(255, 255, 255, .1);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 400;
+}
+
+:root[data-theme='dark'] .settingsInfoTooltip > span::after,
+:root[data-theme='dark'] .settingsInfoTooltip > span:not(.failure)::after {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: #3d3d3d;
+  background: none;
+  content: '';
+}
+
+:root[data-theme='dark'] :is(.copyNotice, .copyTooltip):not(.failure)::after {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 16px;
+  height: 8.5px;
+  transform: translateX(-50%);
+  border: 0;
+  background: url('/assets/tooltip-pointer.svg') center top / 16px 8.5px no-repeat;
+  content: '';
+}
+
+/* Failure tooltips retain the semantic danger surface with the shared geometry. */
+:root[data-theme='dark'] :is(.copyNotice.failure, .copyTooltip.failure) {
+  color: #fff;
+  background: var(--danger-surface, #321b1e);
+}
+
+:root[data-theme='dark'] .copyNotice.failure::after,
+:root[data-theme='dark'] .copyTooltip.failure::after {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--danger-surface, #321b1e);
+  border-bottom: 0;
+  background: none;
+  content: '';
+}
+
+:root[data-theme='dark'] .copyTooltip.global::after { display: none; }
+
+:root[data-theme='dark'] :where(
+  .subscriptionIdentity small,
+  .paymentCardIdentity small,
+  .subscriptionAction small,
+  .billingPaymentEmpty small,
+  .receiptRecipients small,
+  .billingPlanCard > p,
+  .billingRecommendation p,
+  .billingSectionHeader p,
+  .billingCancelPlan p,
+  .subscriptionCancellationNotice small,
+  .apiKeyHint
+) {
+  color: var(--text-secondary);
+}
+
+:root[data-theme='dark'] .billingPage .billingDetailsSummary span {
+  color: var(--text-secondary);
+}
+
+:root[data-theme='dark'] .billingPage :is(.paymentBrandVisa, .paymentBrandMastercard) { background: #000; }
+:root[data-theme='dark'] .billingPage .paymentBrandVisa .paymentBrandLight { display: none; }
+:root[data-theme='dark'] .billingPage .paymentBrandVisa .paymentBrandDark { display: block; }
+:root[data-theme='dark'] .billingPage .paymentBrandFallback { border-color: rgba(255,255,255,.15); }
+
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanCard > button:not(:disabled) {
+  color: #0a0a0a;
+  background: #fff;
+}
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanCard > button:disabled {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #3d3d3d;
+}
+:root[data-theme='dark'] .subscriptionDrawer .drawerPlanCard li::before {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+}
+:root[data-theme='dark'] .subscriptionDrawer .drawerBody .enterpriseBanner button {
+  color: #fff;
+}
+:root[data-theme='dark'] .subscriptionDrawer .drawerBody .enterpriseBanner button img {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+}
+
+@media (max-width: 900px) {
+  :root[data-theme='dark'] .detailHeader { width: 100%; }
+}
+
+:root[data-theme='dark'] .billingPaymentCard .setDefaultPayment { color: #fff; }
+
+/* Add/edit card modal — Figma 817:41962. */
+.billingModalBackdrop:has(.addCardDialog) {
+  background: rgba(0, 0, 0, .56);
+  backdrop-filter: blur(1.25px);
+  -webkit-backdrop-filter: blur(1.25px);
+}
+.addCardDialog {
+  width: min(480.39px, calc(100vw - 48px));
+  max-height: min(620px, calc(100vh - 48px));
+  border: .5px solid rgba(0, 0, 0, .15);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.1), 0 4px 8px -4px rgba(0,0,0,.08), 0 6px 12px -6px rgba(0,0,0,.06), 0 8px 16px -6px rgba(0,0,0,.04), inset 0 -.5px .5px rgba(0,0,0,.1);
+}
+.addCardDialog > header {
+  align-items: center;
+  padding: 8px 8px 8px 12px;
+  border-bottom: 0;
+  background: #fff;
+}
+.addCardDialog > header > div { flex-direction: row; align-items: center; gap: 6px; }
+.addCardDialog > header > div > img { width: 12px; height: 12px; }
+.addCardDialog h2 { font-size: 12px; line-height: 18px; }
+.addCardDialog > header > button { display: grid; width: 18px; height: 18px; padding: 3px; place-items: center; }
+.addCardDialog > header > button img { width: 9px; height: 9px; }
+.addCardDialog form {
+  gap: 12px;
+  padding: 12px;
+  border-top: .5px solid rgba(0,0,0,.1);
+  border-radius: 6px;
+  background: #f5f5f5;
+  box-shadow: 0 -2px 20px -6px rgba(0,0,0,.15), inset 0 -.5px .5px rgba(0,0,0,.1);
+}
+.addCardFields { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+.addCardFields > div { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.addCardDialog form > .addCardFields { display: flex; grid-template-columns: none; gap: 12px; }
+.addCardDialog form > footer { height: 30px; align-items: flex-end; gap: 20px; padding: 0; }
+.addCardDialog form > footer button { height: 18px; padding: 0; border: 0; color: #777; background: transparent; line-height: 18px; }
+.addCardDialog form > footer .confirm { display: flex; align-items: center; gap: 6px; color: #168451; border: 0; background: transparent; }
+.addCardDialog form > footer .confirm img { width: 12px; height: 12px; filter: none !important; opacity: 1; }
+
+:root[data-theme='dark'] .addCardDialog {
+  border-color: rgba(255,255,255,.1);
+  color: #fff;
+  background: #1f1f1f;
+}
+:root[data-theme='dark'] .addCardDialog > header { color: #fff; background: #1f1f1f; }
+:root[data-theme='dark'] .addCardDialog form {
+  color: #fff;
+  border-top-color: rgba(255,255,255,.1);
+  background: #292929;
+  box-shadow: 0 -2px 20px -6px rgba(0,0,0,.5), inset 0 -.5px .5px rgba(0,0,0,.1);
+}
+:root[data-theme='dark'] .addCardDialog input {
+  color: #fff;
+  border-color: rgba(255,255,255,.1);
+  background: #1f1f1f;
+  box-shadow: 0 .5px 1px -1px rgba(0,0,0,.1), inset 0 -.5px .5px 1px rgba(0,0,0,.1);
+}
+:root[data-theme='dark'] .addCardDialog input::placeholder { color: #666; opacity: 1; }
+:root[data-theme='dark'] .addCardDialog form > footer button { color: #a3a3a3; background: transparent; }
+:root[data-theme='dark'] .addCardDialog form > footer .confirm { color: #1fb06b; background: transparent; }
+
+/* Unsaved settings status — Figma 817:42106, dark theme only. */
+:root[data-theme='dark'] .settingsUnsavedBar {
+  border-color: rgba(255,255,255,.1);
+  color: #fff;
+  background: #292929;
+  box-shadow:
+    0 1px 1px rgba(0,0,0,.1),
+    0 4px 4px rgba(0,0,0,.08),
+    0 6px 6px rgba(0,0,0,.06),
+    0 8px 8px rgba(0,0,0,.04),
+    inset 0 -.5px .5px rgba(0,0,0,.1);
+}
+:root[data-theme='dark'] .settingsUnsavedBar button { color: #fff; }
+:root[data-theme='dark'] .settingsUnsavedBar button .settingsIcon { filter: none; opacity: 1; }
+
+/* Review changes dialog — Figma 817:43237, dark theme only. */
+:root[data-theme='dark'] .settingsReviewBackdrop {
+  background: rgba(0,0,0,.56);
+  backdrop-filter: blur(1.25px);
+  -webkit-backdrop-filter: blur(1.25px);
+}
+:root[data-theme='dark'] .settingsReviewModal {
+  width: min(480.39px, calc(100vw - 48px));
+  padding: 12px 12px 14px;
+  border: .5px solid rgba(255,255,255,.1);
+  border-radius: 8px;
+  color: #fff;
+  background: #1f1f1f;
+  box-shadow: 0 1px 2px rgba(0,0,0,.1), 0 4px 8px -4px rgba(0,0,0,.08), 0 6px 12px -6px rgba(0,0,0,.06), 0 8px 16px -6px rgba(0,0,0,.04), inset 0 -.5px .5px 1px rgba(0,0,0,.1);
+}
+:root[data-theme='dark'] .settingsReviewModal > header,
+:root[data-theme='dark'] .settingsReviewModal li { border-color: rgba(255,255,255,.1); }
+:root[data-theme='dark'] .settingsReviewModal > header { background: transparent; }
+:root[data-theme='dark'] .settingsReviewModal header p,
+:root[data-theme='dark'] .settingsReviewModal footer button { color: #a3a3a3; }
+:root[data-theme='dark'] .settingsReviewModal del { color: #8f8f8f; }
+:root[data-theme='dark'] .settingsReviewModal strong { color: #fff; }
+:root[data-theme='dark'] .settingsReviewModal footer .settingsReviewSave { color: #41cb85; }
+:root[data-theme='dark'] .settingsReviewModal .settingsThemeIcon .lightAsset { display: none; }
+:root[data-theme='dark'] .settingsReviewModal .settingsThemeIcon .darkAsset { display: block; filter: none; opacity: 1; }
+
+/* Account name review uses the canonical Settings review dialog without account-page inheritance. */
+.accountNameReviewModal {
+  box-sizing: border-box;
+  width: min(480.39px, calc(100vw - 48px));
+  height: auto;
+  max-height: min(620px, calc(100vh - 48px));
+  align-items: stretch;
+  padding: 12px 12px 14px;
+  overflow: hidden;
+  border-radius: 8px;
+}
+.accountNameReviewModal > header { align-items: flex-start; padding: 0 0 12px; }
+.accountNameReviewModal > header > div { gap: 0; }
+.accountNameReviewModal :is(h2, p, li > span, del, strong, footer button) {
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 400;
+}
+.accountNameReviewModal header > button { width: 18px; height: 18px; padding: 0; }
+.accountNameReviewModal li { min-height: 48px; padding: 14.6px 0; }
+.accountNameReviewModal li > div { gap: 8px; }
+.accountNameReviewModal footer { gap: 20px; padding: 12px 0 0; }
+.accountNameReviewModal footer button { height: 18px; gap: 6px; padding: 0; }
+
+:root[data-theme='dark'] .accountNameReviewModal {
+  border: .5px solid rgba(255,255,255,.1);
+  color: #fff;
+  background: #1f1f1f;
+}
+
+/* Selected options use a neutral white check in dark opened menus. */
+:root[data-theme='dark'] .settingsSelectMenu button[aria-selected='true'] .settingsIcon {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+}
+:root[data-theme='dark'] .settingsUtilityContent footer button { color: #fff; }

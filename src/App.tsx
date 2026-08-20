@@ -54,6 +54,18 @@ type Folder = { name: string; count: number; active?: boolean }
 type FileKind = 'folder' | 'file'
 type FileRow = { name: string; size: string; modified: string; badge?: string; kind: FileKind }
 type AppView = 'home' | 'folder' | 'apiKeys' | 'settings' | 'account' | 'billing'
+type AppearanceTheme = 'light' | 'dark' | 'system'
+
+const readAppearanceTheme = (): AppearanceTheme => {
+  const saved = window.localStorage.getItem('beam-appearance-theme')
+  return saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'system'
+}
+
+const applyAppearanceTheme = (theme: AppearanceTheme) => {
+  const resolvedTheme = theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : theme === 'dark' ? 'dark' : 'light'
+  document.documentElement.dataset.theme = resolvedTheme
+  document.documentElement.style.colorScheme = resolvedTheme
+}
 
 const folders: Folder[] = [
   { name: 'Folder 001', count: 4, active: true },
@@ -104,6 +116,7 @@ function Icon({ src }: { src: string }) {
 
 type SidebarProps = {
   workspaceName: string
+  accountName: string
   folders: Folder[]
   activeFolderName: string
   isCollapsed: boolean
@@ -117,14 +130,17 @@ type SidebarProps = {
   isApiKeysActive: boolean
   onOpenApiKeys: () => void
   isSettingsActive: boolean
+  isFolderNavigationActive: boolean
   onOpenSettings: () => void
   onOpenAccount: () => void
   onOpenBilling: () => void
 }
 
-function Sidebar({ workspaceName, folders: sidebarFolders, activeFolderName, isCollapsed, isSearching, searchQuery, onToggle, onStartSearch, onSearchChange, onOpenFolder, onCreateFolder, isApiKeysActive, onOpenApiKeys, isSettingsActive, onOpenSettings, onOpenAccount, onOpenBilling }: SidebarProps) {
+function Sidebar({ workspaceName, accountName, folders: sidebarFolders, activeFolderName, isCollapsed, isSearching, searchQuery, onToggle, onStartSearch, onSearchChange, onOpenFolder, onCreateFolder, isApiKeysActive, onOpenApiKeys, isSettingsActive, isFolderNavigationActive, onOpenSettings, onOpenAccount, onOpenBilling }: SidebarProps) {
   const [isOrgMenuOpen, setIsOrgMenuOpen] = useState(false)
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
+  const [isAppearanceMenuOpen, setIsAppearanceMenuOpen] = useState(false)
+  const [appearanceTheme, setAppearanceTheme] = useState<AppearanceTheme>(readAppearanceTheme)
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const [folderCreateError, setFolderCreateError] = useState('')
@@ -184,6 +200,28 @@ function Sidebar({ workspaceName, folders: sidebarFolders, activeFolderName, isC
     }
   }, [isAccountMenuOpen])
 
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const syncTheme = () => applyAppearanceTheme(appearanceTheme)
+    syncTheme()
+    window.localStorage.setItem('beam-appearance-theme', appearanceTheme)
+    if (appearanceTheme !== 'system') return
+    media.addEventListener('change', syncTheme)
+    window.addEventListener('focus', syncTheme)
+    window.addEventListener('pageshow', syncTheme)
+    document.addEventListener('visibilitychange', syncTheme)
+    return () => {
+      media.removeEventListener('change', syncTheme)
+      window.removeEventListener('focus', syncTheme)
+      window.removeEventListener('pageshow', syncTheme)
+      document.removeEventListener('visibilitychange', syncTheme)
+    }
+  }, [appearanceTheme])
+
+  useEffect(() => {
+    if (!isAccountMenuOpen) setIsAppearanceMenuOpen(false)
+  }, [isAccountMenuOpen])
+
   return (
     <>
     <aside className={`sidebar${isCollapsed ? ' collapsed' : ''}`}>
@@ -235,6 +273,8 @@ function Sidebar({ workspaceName, folders: sidebarFolders, activeFolderName, isC
               <input
                 autoFocus={isSearching}
                 value={searchQuery}
+                spellCheck={false}
+                autoCapitalize="none"
                 placeholder="Search all files"
                 aria-label="Search all files"
                 onFocus={onStartSearch}
@@ -250,9 +290,9 @@ function Sidebar({ workspaceName, folders: sidebarFolders, activeFolderName, isC
         </div>
 
           <nav className={`folderList${isCollapsed || isSearching ? ' concealed' : ''}`} aria-label="Folders" aria-hidden={isCollapsed || isSearching}>
-            {isNewFolderOpen && <div className={`folderCreateRow${folderCreateError ? ' invalid' : ''}`}><Icon src={icons.folderCreate} /><input ref={newFolderInputRef} value={newFolderName} maxLength={64} aria-label="Folder name" aria-invalid={Boolean(folderCreateError)} aria-describedby={folderCreateError ? 'folder-create-error' : undefined} onChange={(event) => { setNewFolderName(event.target.value); setFolderCreateError('') }} onKeyDown={(event) => { if (event.key === 'Enter') submitNewFolder(); else if (event.key === 'Escape') closeFolderEntry() }} /><button type="button" aria-label="Create folder" onClick={submitNewFolder}><Icon src={icons.folderCreateEnter} /></button>{folderCreateError && <span id="folder-create-error" role="alert">{folderCreateError}</span>}</div>}
+            {isNewFolderOpen && <div className={`folderCreateRow${folderCreateError ? ' invalid' : ''}`}><Icon src={icons.folderCreate} /><input ref={newFolderInputRef} value={newFolderName} maxLength={64} placeholder="Enter your folder name" spellCheck={false} autoCapitalize="none" aria-label="Folder name" aria-invalid={Boolean(folderCreateError)} aria-describedby={folderCreateError ? 'folder-create-error' : undefined} onChange={(event) => { setNewFolderName(event.target.value); setFolderCreateError('') }} onKeyDown={(event) => { if (event.key === 'Enter') submitNewFolder(); else if (event.key === 'Escape') closeFolderEntry() }} /><button type="button" aria-label="Create folder" onClick={submitNewFolder}><Icon src={icons.folderCreateEnter} /></button>{folderCreateError && <span id="folder-create-error" role="alert">{folderCreateError}</span>}</div>}
             {sidebarFolders.map((folder) => (
-              <button className={`folderRow${!isApiKeysActive && !isSettingsActive && folder.name === activeFolderName ? ' active' : ''}`} key={folder.name} tabIndex={isCollapsed || isSearching ? -1 : 0} onClick={() => onOpenFolder(folder.name)}>
+              <button className={`folderRow${isFolderNavigationActive && folder.name === activeFolderName ? ' active' : ''}`} key={folder.name} tabIndex={isCollapsed || isSearching ? -1 : 0} onClick={() => onOpenFolder(folder.name)}>
                 <span>{folder.name}</span><span>{folder.count}</span>
               </button>
             ))}
@@ -269,7 +309,7 @@ function Sidebar({ workspaceName, folders: sidebarFolders, activeFolderName, isC
             <div className="accountMenu" role="menu" aria-label="Account menu">
               <header className="accountIdentity">
                 <img src="/assets/account-menu-avatar.png" alt="" />
-                <div><strong>Michele J.</strong><span>michele@beam.app</span></div>
+                <div><strong>{accountName}</strong><span>michele@beam.app</span></div>
               </header>
               <section className="accountPlan" aria-label="Current plan and usage">
                 <div className="accountPlanHeading"><strong>Free plan</strong><span>24% used</span></div>
@@ -281,6 +321,16 @@ function Sidebar({ workspaceName, folders: sidebarFolders, activeFolderName, isC
               <div className="accountMenuGroup">
                 <button type="button" role="menuitem" onClick={() => { setIsAccountMenuOpen(false); onOpenAccount() }}>Account settings</button>
                 <button type="button" role="menuitem" onClick={() => { setIsAccountMenuOpen(false); onOpenBilling() }}>Billing &amp; usage</button>
+                <div className="appearanceMenuControl" onMouseLeave={() => setIsAppearanceMenuOpen(false)}>
+                  <button className={isAppearanceMenuOpen ? 'submenuOpen' : ''} type="button" role="menuitem" aria-haspopup="menu" aria-expanded={isAppearanceMenuOpen} onClick={() => setIsAppearanceMenuOpen((open) => !open)} onMouseEnter={() => setIsAppearanceMenuOpen(true)}>
+                    <span className="appearanceMenuLabel">Appearance</span><span className="accountMenuValue">{appearanceTheme[0].toUpperCase() + appearanceTheme.slice(1)} <span aria-hidden="true">›</span></span>
+                  </button>
+                  {isAppearanceMenuOpen && <div className="appearanceSubmenu" role="menu" aria-label="Appearance theme">
+                    {(['light', 'dark', 'system'] as const).map((theme) => <button className={appearanceTheme === theme ? 'selected' : ''} type="button" role="menuitemradio" aria-checked={appearanceTheme === theme} key={theme} onClick={() => { applyAppearanceTheme(theme); setAppearanceTheme(theme); setIsAppearanceMenuOpen(false) }}>
+                      <img className="appearanceThemeIcon" src={`/assets/appearance-${theme}.svg`} alt="" aria-hidden="true" /><span>{theme[0].toUpperCase() + theme.slice(1)}</span>{appearanceTheme === theme && <span className="appearanceCheck" aria-hidden="true">✓</span>}
+                    </button>)}
+                  </div>}
+                </div>
                 <button type="button" role="menuitem" onClick={() => setIsAccountMenuOpen(false)}>Help &amp; feedback</button>
               </div>
               <div className="accountMenuGroup accountMenuFooter">
@@ -288,9 +338,9 @@ function Sidebar({ workspaceName, folders: sidebarFolders, activeFolderName, isC
               </div>
             </div>
           )}
-          <button className={`accountRow${isAccountMenuOpen ? ' active' : ''}`} aria-label="Open Michele J. account menu" aria-haspopup="menu" aria-expanded={isAccountMenuOpen} title={isCollapsed ? 'Michele J.' : undefined} onClick={() => setIsAccountMenuOpen((open) => !open)}>
-            <img className="avatar" src={icons.avatar} alt="Michele J." />
-            <span className="sidebarLabel">Michele J.</span>
+          <button className={`accountRow${isAccountMenuOpen ? ' active' : ''}`} aria-label={`Open ${accountName} account menu`} aria-haspopup="menu" aria-expanded={isAccountMenuOpen} title={isCollapsed ? accountName : undefined} onClick={() => setIsAccountMenuOpen((open) => !open)}>
+            <img className="avatar" src={icons.avatar} alt={accountName} />
+            <span className="sidebarLabel">{accountName}</span>
             <span className={`accountChevronIcon${isAccountMenuOpen ? ' open' : ''}`}><Icon src={isCollapsed ? icons.accountChevronCollapsed : icons.accountChevron} /></span>
           </button>
         </div>
@@ -1099,6 +1149,8 @@ export default function App() {
   const [settingsLeaveRequest, setSettingsLeaveRequest] = useState(0)
   const [pendingView, setPendingView] = useState<AppView | null>(null)
   const [settingsSaveToast, setSettingsSaveToast] = useState('')
+  const [accountName, setAccountName] = useState('Michele J.')
+  const [accountSaveToast, setAccountSaveToast] = useState('')
   const settingsSaveToastTimer = useRef<number | null>(null)
 
   const normalizedQuery = searchQuery.trim().toLowerCase()
@@ -1201,6 +1253,7 @@ export default function App() {
     <main className={`appShell${isSidebarCollapsed ? ' sidebarCollapsed' : ''}`}>
       <Sidebar
         workspaceName={workspaceName}
+        accountName={accountName}
         folders={folderRows}
         activeFolderName={selectedFolderName}
         isCollapsed={isSidebarCollapsed}
@@ -1214,12 +1267,13 @@ export default function App() {
         isApiKeysActive={currentView === 'apiKeys'}
         onOpenApiKeys={() => { openView('apiKeys'); setSearchQuery(''); setIsSearching(false) }}
         isSettingsActive={currentView === 'settings'}
+        isFolderNavigationActive={currentView === 'home' || currentView === 'folder'}
         onOpenSettings={() => { openView('settings'); setSearchQuery(''); setIsSearching(false) }}
         onOpenAccount={() => { openView('account'); setSearchQuery(''); setIsSearching(false) }}
         onOpenBilling={() => { openView('billing'); setSearchQuery(''); setIsSearching(false) }}
       />
       <section className="content">
-        {currentView === 'billing' && !isSearching ? <BillingUsagePage /> : currentView === 'account' && !isSearching ? <AccountProfilePage /> : currentView === 'settings' && !isSearching ? <SettingsPage onOpenApiKeys={() => openView('apiKeys')} onWorkspaceNameChange={setWorkspaceName} onDirtyChange={setSettingsDirty} onSaveSuccess={showSettingsSaveToast} leaveRequest={settingsLeaveRequest} onLeaveResolved={(proceed) => {
+        {currentView === 'billing' && !isSearching ? <BillingUsagePage /> : currentView === 'account' && !isSearching ? <AccountProfilePage displayName={accountName} onDisplayNameSave={(name) => { setAccountName(name); setAccountSaveToast(`${name} is now your display name.`); window.setTimeout(() => setAccountSaveToast(''), 3000) }} /> : currentView === 'settings' && !isSearching ? <SettingsPage onOpenApiKeys={() => openView('apiKeys')} onWorkspaceNameChange={setWorkspaceName} onDirtyChange={setSettingsDirty} onSaveSuccess={showSettingsSaveToast} leaveRequest={settingsLeaveRequest} onLeaveResolved={(proceed) => {
           if (!proceed) { setPendingView(null); return }
           setSettingsDirty(false)
           if (pendingView) { const nextView = pendingView; setPendingView(null); commitView(nextView) }
@@ -1257,6 +1311,7 @@ export default function App() {
         )}
       </section>
       {settingsSaveToast && <div className="apiCreatedToast" role="status" aria-live="polite"><span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span><div><strong>Settings saved</strong><span>{settingsSaveToast}</span></div></div>}
+      {accountSaveToast && <div className="apiCreatedToast" role="status" aria-live="polite"><span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span><div><strong>Account updated</strong><span>{accountSaveToast}</span></div></div>}
       {folderToRename && <RenameFolderModal currentName={folderToRename} onRename={renameFolder} onClose={() => setFolderToRename(null)} />}
       {folderToDelete && <DeleteItemModal itemName={folderToDelete} itemType="folder" onConfirm={deleteFolder} onClose={() => setFolderToDelete(null)} />}
       {isEmptyCreateOpen && <NewFolderModal onCreate={(name) => { createFolder(name); setIsEmptyCreateOpen(false) }} onClose={() => setIsEmptyCreateOpen(false)} />}

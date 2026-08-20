@@ -1,7 +1,8 @@
 <svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g id="Frame 90">
-<rect x="0.5" y="0.5" width="11" height="11" rx="3.5" fill="white"/>
-<rect x="0.5" y="0.5" width="11" height="11" rx="3.5" stroke="#8F8F8F"/>
-<path id="/" d="M4 10L6.97179 2H8L5.02821 10H4Z" fill="#8F8F8F"/>
+<g id="Group">
+<g id="Vector">
+</g>
+<path id="Vector_2" d="M8 0.5H4C2.067 0.5 0.5 2.067 0.5 4V8C0.5 9.933 2.067 11.5 4 11.5H8C9.933 11.5 11.5 9.933 11.5 8V4C11.5 2.067 9.933 0.5 8 0.5Z" stroke="#666666"/>
+<path id="Vector_3" d="M4 10L6.97179 2H8L5.02821 10H4Z" fill="#666666"/>
 </g>
 </svg>

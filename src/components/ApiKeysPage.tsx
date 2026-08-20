@@ -294,7 +294,7 @@ export default function ApiKeysPage() {
         <div className="apiKeyFields">
           <label className="apiNameField">
             <span className="srOnly">API key name</span>
-            <input value={name} onChange={(event) => setName(event.target.value)} onBlur={() => setIsNameTouched(true)} placeholder="Enter the name" aria-invalid={isNameTouched && Boolean(nameError)} aria-describedby="api-key-name-feedback" />
+            <input value={name} spellCheck={false} autoCapitalize="none" onChange={(event) => setName(event.target.value)} onBlur={() => setIsNameTouched(true)} placeholder="Enter the name" aria-invalid={isNameTouched && Boolean(nameError)} aria-describedby="api-key-name-feedback" />
           </label>
           <SelectField label="Access" value={access} options={['All workspaces', 'Marketing ws', 'Docs workspace']} onChange={setAccess} />
           <SelectField label="Permission" value={permission} options={['Admin', 'Write']} onChange={setPermission} />
