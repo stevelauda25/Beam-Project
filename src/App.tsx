@@ -122,7 +122,17 @@ const initialWorkspaceContent: Record<string, WorkspaceContent> = {
 const readWorkspaceContent = (): Record<string, WorkspaceContent> => {
   try {
     const saved = JSON.parse(window.localStorage.getItem('beam-workspace-content-v1') ?? '{}') as Record<string, WorkspaceContent>
-    return { ...initialWorkspaceContent, ...saved }
+    const content = { ...initialWorkspaceContent, ...saved }
+    const personal = content.personal ?? populatedWorkspaceContent()
+    const hasStarterFolder = personal.folders.some((folder) => folder.name === 'Folder 001')
+    if (!hasStarterFolder) {
+      content.personal = {
+        folders: [{ ...folders[0] }, ...personal.folders],
+        files: [{ ...files[0] }, ...personal.files],
+        folderContents: { ...personal.folderContents, 'Folder 001': initialFolderFiles.map((file) => ({ ...file })) },
+      }
+    }
+    return content
   } catch { return initialWorkspaceContent }
 }
 
@@ -1208,8 +1218,10 @@ export default function App() {
   const [accountName, setAccountName] = useState(readAccountName)
   const [accountSaveToast, setAccountSaveToast] = useState('')
   const [workspaceCreateToast, setWorkspaceCreateToast] = useState('')
+  const [workspaceDeleteToast, setWorkspaceDeleteToast] = useState('')
   const [isCreateWorkspaceOpen, setIsCreateWorkspaceOpen] = useState(false)
   const settingsSaveToastTimer = useRef<number | null>(null)
+  const skipNextWorkspaceContentSave = useRef(false)
   const workspaceBehavior = readWorkspaceBehavior(activeWorkspace.id)
 
   const normalizedQuery = searchQuery.trim().toLowerCase()
@@ -1231,6 +1243,10 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (skipNextWorkspaceContentSave.current) {
+      skipNextWorkspaceContentSave.current = false
+      return
+    }
     window.localStorage.setItem('beam-workspace-content-v1', JSON.stringify(workspaceContent))
   }, [workspaceContent])
 
@@ -1300,6 +1316,10 @@ export default function App() {
 
   const removeFolder = (folderName: string) => {
     const { [folderName]: _deletedItems, ...remainingContents } = activeContent.folderContents
+    // Folder deletion is intentionally session-only in this prototype. Preserve
+    // the current stored snapshot so refreshing restores the folder and files.
+    window.localStorage.setItem('beam-workspace-content-v1', JSON.stringify({ ...workspaceContent, [activeWorkspace.id]: activeContent }))
+    skipNextWorkspaceContentSave.current = true
     setWorkspaceContent((current) => ({ ...current, [activeWorkspace.id]: {
       folders: activeContent.folders.filter((folder) => folder.name !== folderName),
       files: activeContent.files.filter((file) => file.name !== folderName),
@@ -1381,6 +1401,21 @@ export default function App() {
     window.setTimeout(() => setWorkspaceCreateToast(''), 3000)
   }
 
+  const deleteWorkspace = (workspaceId: string) => {
+    if (initialWorkspaces.some((workspace) => workspace.id === workspaceId)) return
+    const workspaceToDelete = workspaces.find((workspace) => workspace.id === workspaceId)
+    const nextWorkspaces = workspaces.filter((workspace) => workspace.id !== workspaceId)
+    setWorkspaces(nextWorkspaces)
+    window.localStorage.setItem('beam-created-workspaces-v1', JSON.stringify(nextWorkspaces.filter((workspace) => !initialWorkspaces.some((initial) => initial.id === workspace.id))))
+    setWorkspaceContent((current) => { const { [workspaceId]: _deletedWorkspace, ...remaining } = current; return remaining })
+    ;[`beam-settings-v3-${workspaceId}`, `beam-members-v1-${workspaceId}`, `beam-api-keys-v1-${workspaceId}`, `beam-billing-v1-${workspaceId}`].forEach((key) => window.localStorage.removeItem(key))
+    setSettingsDirty(false)
+    commitWorkspaceChange('personal')
+    commitView('home')
+    setWorkspaceDeleteToast(`${workspaceToDelete?.name ?? 'Workspace'} was permanently deleted.`)
+    window.setTimeout(() => setWorkspaceDeleteToast(''), 3000)
+  }
+
   return (
     <main className={`appShell${isSidebarCollapsed ? ' sidebarCollapsed' : ''}`}>
       <Sidebar
@@ -1409,7 +1444,7 @@ export default function App() {
         onOpenBilling={() => { openView('billing'); setSearchQuery(''); setIsSearching(false) }}
       />
       <section className="content">
-        {currentView === 'billing' && !isSearching ? <BillingUsagePage key={activeWorkspace.id} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.name} storageUsedMb={Math.round(totalStorageBytes / (1024 * 1024))} /> : currentView === 'account' && !isSearching ? <AccountProfilePage displayName={accountName} onDisplayNameSave={saveAccountName} /> : currentView === 'settings' && !isSearching ? <SettingsPage key={activeWorkspace.id} workspace={activeWorkspace} storageUsedMb={Math.round(totalStorageBytes / (1024 * 1024))} onOpenApiKeys={() => openView('apiKeys')} onWorkspaceNameChange={renameWorkspace} onDirtyChange={setSettingsDirty} onSaveSuccess={showSettingsSaveToast} leaveRequest={settingsLeaveRequest} onLeaveResolved={(proceed) => {
+        {currentView === 'billing' && !isSearching ? <BillingUsagePage key={activeWorkspace.id} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.name} storageUsedMb={Math.round(totalStorageBytes / (1024 * 1024))} /> : currentView === 'account' && !isSearching ? <AccountProfilePage displayName={accountName} onDisplayNameSave={saveAccountName} /> : currentView === 'settings' && !isSearching ? <SettingsPage key={activeWorkspace.id} workspace={activeWorkspace} storageUsedMb={Math.round(totalStorageBytes / (1024 * 1024))} onOpenApiKeys={() => openView('apiKeys')} onWorkspaceNameChange={renameWorkspace} canDeleteWorkspace={!initialWorkspaces.some((workspace) => workspace.id === activeWorkspace.id)} onDeleteWorkspace={deleteWorkspace} onDirtyChange={setSettingsDirty} onSaveSuccess={showSettingsSaveToast} leaveRequest={settingsLeaveRequest} onLeaveResolved={(proceed) => {
           if (!proceed) { setPendingView(null); setPendingWorkspaceId(null); return }
           setSettingsDirty(false)
           if (pendingWorkspaceId) { const nextWorkspaceId = pendingWorkspaceId; setPendingWorkspaceId(null); commitWorkspaceChange(nextWorkspaceId) }
@@ -1454,6 +1489,7 @@ export default function App() {
       {settingsSaveToast && <div className="apiCreatedToast" role="status" aria-live="polite"><span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span><div><strong>Settings saved</strong><span>{settingsSaveToast}</span></div></div>}
       {accountSaveToast && <div className="apiCreatedToast" role="status" aria-live="polite"><span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span><div><strong>Account updated</strong><span>{accountSaveToast}</span></div></div>}
       {workspaceCreateToast && <div className="apiCreatedToast" role="status" aria-live="polite"><span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span><div><strong>Workspace created</strong><span>{workspaceCreateToast}</span></div></div>}
+      {workspaceDeleteToast && <div className="apiCreatedToast" role="status" aria-live="polite"><span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span><div><strong>Workspace deleted</strong><span>{workspaceDeleteToast}</span></div></div>}
       {folderToRename && <RenameFolderModal currentName={folderToRename} existingNames={folderRows.map((folder) => folder.name)} onRename={renameFolder} onClose={() => setFolderToRename(null)} />}
       {folderToDelete && <DeleteItemModal itemName={folderToDelete} itemType="folder" retention={workspaceBehavior.trashRetention} onConfirm={() => removeFolder(folderToDelete)} onClose={() => setFolderToDelete(null)} />}
       {isEmptyCreateOpen && <NewFolderModal existingNames={folderRows.map((folder) => folder.name)} onCreate={(name) => { createFolder(name); setIsEmptyCreateOpen(false) }} onClose={() => setIsEmptyCreateOpen(false)} />}

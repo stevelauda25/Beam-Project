@@ -543,6 +543,7 @@ button { border: 0; background: transparent; cursor: pointer; }
 .drawerPlanPrice strong { font-size: 24px; line-height: 28px; font-weight: 400; }
 .drawerPlanPrice span { color: var(--beam-text-muted); }
 .drawerPlanCard > button { width: 100%; height: 26px; padding: 4px 8px; border-radius: 4px; color: #fff; background: #525252; }
+.drawerPlanCard > button.planActionInactive { cursor: default; }
 .drawerPlanCard > button:disabled { border: .5px solid var(--border); color: #a3a3a3; background: #f0f0f0; cursor: default; }
 .drawerPlanCard ul { display: flex; flex-direction: column; gap: 10px; margin: 16px 0 0; padding: 16px 0 0; border-top: .5px solid var(--border); list-style: none; }
 .drawerPlanCard li::before { margin-right: 7px; color: var(--beam-success); content: '✓'; }
@@ -925,6 +926,7 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 .memberResend,
 .memberPendingRemove { display: grid; width: 18px; height: 18px; padding: 3px; place-items: center; }
 .memberActions img { display: block; width: 12px; height: 12px; }
+.memberRemoveGlyph { display: none; }
 .memberActionTooltip { position: relative; }
 .memberActionTooltip::before { position: absolute; z-index: 40; right: -6px; bottom: calc(100% + 7px); padding: 4px 8px; transform: translateY(2px); border: .5px solid rgba(255,255,255,.14); border-radius: 6px; opacity: 0; color: #fff; background: #3d3d3d; box-shadow: 0 1px 2px rgba(0,0,0,.18), 0 4px 8px -4px rgba(0,0,0,.2), inset 0 .5px .5px rgba(255,255,255,.12); font-size: 12px; line-height: 18px; font-weight: 400; white-space: nowrap; pointer-events: none; transition: opacity 120ms ease, transform 120ms ease; content: attr(data-tooltip); }
 .memberActionTooltip::after { position: absolute; z-index: 40; right: 3px; bottom: calc(100% + 3px); width: 8px; height: 8px; transform: translateY(2px) rotate(45deg); border-right: .5px solid rgba(255,255,255,.14); border-bottom: .5px solid rgba(255,255,255,.14); opacity: 0; background: #3d3d3d; pointer-events: none; transition: opacity 120ms ease, transform 120ms ease; content: ''; }
@@ -1005,6 +1007,8 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 .settingsDeleteModal > div { display: flex; min-height: 112px; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 24px; padding: 12px; border: .5px solid #c4c4c4; border-radius: 6px; background: #fff; box-shadow: 0 8px 16px -6px rgba(0,0,0,.04), inset 0 -.5px .5px rgba(0,0,0,.1); }
 .settingsDeleteModal p { width: 100%; margin: 0; color: #525252; }
 .settingsDeleteModal > div button { height: 18px; padding: 0; color: #525252; background: transparent; }
+.settingsDangerButton:disabled { color: #a3a3a3; cursor: not-allowed; }
+.settingsDangerButton:disabled .settingsIcon { opacity: .45; }
 .settingsUtilityContent { display: flex; min-height: 112px; flex-direction: column; gap: 2px; padding: 12px; border: .5px solid #c4c4c4; border-radius: 6px; background: #fff; box-shadow: 0 8px 16px -6px rgba(0,0,0,.04), inset 0 -.5px .5px rgba(0,0,0,.1); }
 .settingsUtilityContent > div { display: flex; justify-content: space-between; gap: 16px; }
 .settingsUtilityContent strong { font-weight: 400; }
@@ -2615,15 +2619,11 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 }
 
 /* Destructive member actions use the same dark-theme red as every danger dialog. */
-:root[data-theme='dark'] .memberRemove {
-  position: relative;
-}
-
-:root[data-theme='dark'] .memberRemove::before {
+:root[data-theme='dark'] .memberRemoveGlyph {
+  display: block;
   width: 12px;
   height: 12px;
   background: var(--danger-text);
-  content: '';
   -webkit-mask: url('/assets/member-trash.svg') center / 12px 12px no-repeat;
   mask: url('/assets/member-trash.svg') center / 12px 12px no-repeat;
 }
