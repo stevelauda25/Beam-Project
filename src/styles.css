@@ -815,7 +815,7 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 .settingsPageHeader { width: 100%; }
 .settingsPageHeader h1 { margin-bottom: 0; }
 .settingsLayout { display: grid; width: 100%; grid-template-columns: 168px minmax(0, 1fr) minmax(0, 744px) minmax(0, 1fr) 168px; align-items: start; }
-.settingsNav { position: sticky; top: 0; display: flex; grid-column: 1; grid-row: 1; flex-direction: column; gap: 4px; padding-top: 46px; }
+.settingsNav { position: sticky; top: 0; display: flex; grid-column: 1; grid-row: 1; flex-direction: column; gap: 4px; padding-top: 40px; }
 .settingsNav button { display: flex; width: 168px; height: 22px; align-items: center; padding: 2px 8px; border-radius: 4px; text-align: left; }
 .settingsNav button.active, .settingsNav button:hover, .settingsNav button:focus-visible { outline: 0; background: #f0f0f0; }
 .settingsMobileNav { display: none; }
@@ -891,6 +891,7 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 .workspaceAccessNotice strong { font-weight: 400; }
 .workspaceAccessNotice span { color: #525252; }
 .workspaceRoleBadge { display: inline-flex; height: 18px; flex: 0 0 auto; align-items: center; padding: 1px 6px; border-radius: 999px; color: #456b70; background: #e5eeee; font-size: 10px; line-height: 16px; }
+.workspaceRoleValue { color: #0a0a0a; }
 .memberInvite { position: relative; display: grid; min-height: 70px; grid-template-columns: minmax(180px, 1fr) minmax(360px, 1.35fr); align-items: center; gap: 16px; padding: 12px; border-bottom: .5px solid var(--border); }
 .memberInvite > div:first-child { display: flex; flex-direction: column; gap: 2px; }
 .memberInvite label { color: #0a0a0a; }
@@ -3054,6 +3055,7 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 :root[data-theme='dark'] .workspaceAccessNotice span { color: #a3a3a3; }
 :root[data-theme='dark'] .workspaceRoleBadge,
 :root[data-theme='dark'] .workspaceAvatar { border-color: rgba(255,255,255,.1); }
+:root[data-theme='dark'] .workspaceRoleValue { color: #fff; }
 :root[data-theme='dark'] .memberInvite,
 :root[data-theme='dark'] .memberRow { border-color: rgba(255,255,255,.1); background: #1f1f1f; }
 :root[data-theme='dark'] .memberRow:last-child { border-bottom-color: rgba(255,255,255,.1); }
