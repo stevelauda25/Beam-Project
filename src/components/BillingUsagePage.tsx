@@ -28,31 +28,38 @@ const invoices = [
   { id: 'INV-2026-0042', date: 'May 1, 2026', period: 'May 1 – May 31, 2026', plan: 'Pro · Monthly', amount: '$12.00', status: 'Refunded' },
 ] as const
 const initialBillingDetails = { name: 'Michele J.', country: 'Indonesia', address: 'Jl. Sunset Road No. 88', city: 'Denpasar', postalCode: '80361', taxId: '12.345.678.9-012.000' }
+type StoredBilling = { billingCycle: BillingCycle; currentPlanId: PlanId; cards: Card[]; cancellationScheduled: boolean; primaryReceiptEmail: string; additionalEmails: string[]; usageAlert: string; autoUpgrade: boolean; billingDetails: typeof initialBillingDetails }
+const defaultBilling: StoredBilling = { billingCycle: 'monthly', currentPlanId: 'free', cards: [{ brand: 'Visa', lastFour: '4242', expiry: '08/29' }], cancellationScheduled: false, primaryReceiptEmail: 'michele@beam.app', additionalEmails: ['finance@company.com', 'tech@company.com'], usageAlert: '80%', autoUpgrade: false, billingDetails: initialBillingDetails }
+const readBilling = (workspaceId: string): StoredBilling => {
+  try { return { ...defaultBilling, ...JSON.parse(window.localStorage.getItem(`beam-billing-v1-${workspaceId}`) ?? '{}') } as StoredBilling }
+  catch { return defaultBilling }
+}
 
 const priceFor = (plan: Plan, cycle: BillingCycle) => cycle === 'annual' ? plan.annualPrice : plan.monthlyPrice
 const money = (value: number) => `$${value.toFixed(2)}`
 
-export default function BillingUsagePage() {
+export default function BillingUsagePage({ workspaceId, workspaceName, storageUsedMb }: { workspaceId: string; workspaceName: string; storageUsedMb: number }) {
+  const [initialBilling] = useState(() => readBilling(workspaceId))
   const [activeSection, setActiveSection] = useState('billing-subscription')
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly')
-  const [currentPlanId, setCurrentPlanId] = useState<PlanId>('free')
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>(initialBilling.billingCycle)
+  const [currentPlanId, setCurrentPlanId] = useState<PlanId>(initialBilling.currentPlanId)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerStep, setDrawerStep] = useState<DrawerStep>('plans')
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null)
-  const [cards, setCards] = useState<Card[]>([{ brand: 'Visa', lastFour: '4242', expiry: '08/29' }])
+  const [cards, setCards] = useState<Card[]>(initialBilling.cards)
   const [editingCardIndex, setEditingCardIndex] = useState<number | null>(null)
   const [cardDialogOpen, setCardDialogOpen] = useState(false)
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
-  const [cancellationScheduled, setCancellationScheduled] = useState(false)
-  const [primaryReceiptEmail, setPrimaryReceiptEmail] = useState('michele@beam.app')
-  const [additionalEmails, setAdditionalEmails] = useState<string[]>(['finance@company.com', 'tech@company.com'])
+  const [cancellationScheduled, setCancellationScheduled] = useState(initialBilling.cancellationScheduled)
+  const [primaryReceiptEmail, setPrimaryReceiptEmail] = useState(initialBilling.primaryReceiptEmail)
+  const [additionalEmails, setAdditionalEmails] = useState<string[]>(initialBilling.additionalEmails)
   const [emailDraft, setEmailDraft] = useState('')
   const [isAddingReceipt, setIsAddingReceipt] = useState(false)
   const [receiptError, setReceiptError] = useState('')
-  const [usageAlert, setUsageAlert] = useState('80%')
-  const [autoUpgrade, setAutoUpgrade] = useState(false)
-  const [billingDetails, setBillingDetails] = useState(initialBillingDetails)
-  const [billingDetailsDraft, setBillingDetailsDraft] = useState(initialBillingDetails)
+  const [usageAlert, setUsageAlert] = useState(initialBilling.usageAlert)
+  const [autoUpgrade, setAutoUpgrade] = useState(initialBilling.autoUpgrade)
+  const [billingDetails, setBillingDetails] = useState(initialBilling.billingDetails)
+  const [billingDetailsDraft, setBillingDetailsDraft] = useState(initialBilling.billingDetails)
   const [isEditingBillingDetails, setIsEditingBillingDetails] = useState(false)
   const [toast, setToast] = useState('')
 
@@ -65,6 +72,10 @@ export default function BillingUsagePage() {
   const unusedCredit = priceFor(currentPlan, billingCycle) * remainingRatio
   const remainingPlanCharge = selectedPlan ? priceFor(selectedPlan, billingCycle) * remainingRatio : 0
   const dueToday = Math.max(0, remainingPlanCharge - unusedCredit)
+  const capacityMb = currentPlanId === 'free' ? 5120 : currentPlanId === 'pro' ? 1024 * 1024 : 5 * 1024 * 1024
+  const usagePercent = Math.min(100, capacityMb ? (storageUsedMb / capacityMb) * 100 : 0)
+  const availableMb = Math.max(0, capacityMb - storageUsedMb)
+  const availableLabel = availableMb >= 1024 ? `${(availableMb / 1024).toLocaleString('en-US', { maximumFractionDigits: 1 })} GB available` : `${availableMb.toLocaleString('en-US')} MB available`
 
   const notify = (message: string) => {
     setToast(message)
@@ -81,6 +92,11 @@ export default function BillingUsagePage() {
     document.addEventListener('keydown', closeOnEscape)
     return () => document.removeEventListener('keydown', closeOnEscape)
   }, [drawerOpen, cardDialogOpen, cancelDialogOpen])
+
+  useEffect(() => {
+    const value: StoredBilling = { billingCycle, currentPlanId, cards, cancellationScheduled, primaryReceiptEmail, additionalEmails, usageAlert, autoUpgrade, billingDetails }
+    window.localStorage.setItem(`beam-billing-v1-${workspaceId}`, JSON.stringify(value))
+  }, [workspaceId, billingCycle, currentPlanId, cards, cancellationScheduled, primaryReceiptEmail, additionalEmails, usageAlert, autoUpgrade, billingDetails])
 
   const confirmPlanChange = () => {
     if (!selectedPlan) return
@@ -111,13 +127,13 @@ export default function BillingUsagePage() {
       <div className="accountPageContent billingContent">
         <section className="profileGroup billingSubscription" id="billing-subscription" aria-labelledby="billing-subscription-title">
           <header><h2 id="billing-subscription-title">Current subscription</h2></header>
-          <div className="subscriptionSummary"><div className="subscriptionIdentity"><div><span className="subscriptionPlanName">Beam - {currentPlan.name} Plan</span><small>{billingCycle === 'annual' ? 'Annual billing' : 'Monthly billing'} · Personal workspace</small></div></div><button className="subscriptionUpgrade" type="button" onClick={openPlanDrawer}><img src="/assets/billing-upgrade.svg" alt="" />Upgrade plan</button></div>
-          <div className="subscriptionFacts"><div><span>Next renewal</span><strong>{currentPlan.id === 'free' ? 'No renewal' : 'September 19, 2026'}</strong></div><div><span>Next charge</span><strong>{currentPlan.id === 'free' ? '$0.00' : money(billingCycle === 'annual' ? priceFor(currentPlan, billingCycle) * 12 : priceFor(currentPlan, billingCycle))}</strong></div><div><span>Storage</span><strong>1.2 GB of {currentPlan.storage}</strong></div></div>
+          <div className="subscriptionSummary"><div className="subscriptionIdentity"><div><span className="subscriptionPlanName">Beam - {currentPlan.name} Plan</span><small>{billingCycle === 'annual' ? 'Annual billing' : 'Monthly billing'} · {workspaceName}</small></div></div><button className="subscriptionUpgrade" type="button" onClick={openPlanDrawer}><img src="/assets/billing-upgrade.svg" alt="" />Upgrade plan</button></div>
+          <div className="subscriptionFacts"><div><span>Next renewal</span><strong>{currentPlan.id === 'free' ? 'No renewal' : 'September 19, 2026'}</strong></div><div><span>Next charge</span><strong>{currentPlan.id === 'free' ? '$0.00' : money(billingCycle === 'annual' ? priceFor(currentPlan, billingCycle) * 12 : priceFor(currentPlan, billingCycle))}</strong></div><div><span>Storage</span><strong>{storageUsedMb.toLocaleString('en-US')} MB of {currentPlan.storage}</strong></div></div>
           {cancellationScheduled && <div className="subscriptionCancellationNotice"><div><span>Cancellation scheduled</span><small>Your {currentPlan.name} plan remains active until September 19, 2026. Your files will not be deleted.</small></div><button type="button" onClick={() => { setCancellationScheduled(false); notify('Your subscription will continue.') }}>Keep subscription</button></div>}
         </section>
 
         <section className="profileGroup" id="billing-usage" aria-labelledby="billing-usage-title"><header><h2 id="billing-usage-title">Usage &amp; limits</h2></header>
-          <div className="billingUsageBlock"><div className="billingUsageHeading"><span>Storage used</span><span>24% used</span></div><ProgressBar value={24} label="Storage used" /><div className="billingUsageFooter"><span>1,276 MB <em>of {currentPlan.storage}</em></span><span>3.8 GB available</span></div></div>
+          <div className="billingUsageBlock"><div className="billingUsageHeading"><span>Storage used</span><span>{Math.round(usagePercent)}% used</span></div><ProgressBar value={usagePercent} label="Storage used" /><div className="billingUsageFooter"><span>{storageUsedMb.toLocaleString('en-US')} MB <em>of {currentPlan.storage}</em></span><span>{availableLabel}</span></div></div>
           <div className="profileRow"><div><span>Usage notification</span><small>Email workspace owners when storage reaches this level.</small></div><SelectControl className="billingThresholdSelect" value={usageAlert} options={['80%', '90%', '100%']} label="Usage notification threshold" onChange={setUsageAlert} /></div>
           <div className="profileRow"><div><span>Automatic upgrade</span><small>Move to the next plan before new uploads are paused.</small></div><Toggle checked={autoUpgrade} onChange={setAutoUpgrade} label="Automatic upgrade" /></div>
         </section>

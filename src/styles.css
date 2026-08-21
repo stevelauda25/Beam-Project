@@ -123,6 +123,8 @@ button { font: inherit; color: inherit; }
 .accountGroup button,
 .organizationLabel { display: flex; width: 100%; height: 22px; align-items: center; gap: 4px; padding: 4px 6px; border: .5px solid transparent; border-radius: 4px; color: #fff; text-align: left; white-space: nowrap; }
 .organizationOption { gap: 6px; }
+.workspaceAddAction { gap: 6px !important; }
+.workspaceAddAction img { display: block; width: 12px; height: 12px; flex: 0 0 12px; }
 .organizationOption > span:nth-child(2) { flex: 1; }
 .organizationOption:hover,
 .organizationOption:focus-visible,
@@ -263,6 +265,8 @@ button { border: 0; background: transparent; cursor: pointer; }
 .newFolderModal input { width: 100%; height: 30px; padding: 6px 88px 6px 8px; border: .5px solid rgba(0,0,0,.2); border-radius: 4px; outline: none; color: #0a0a0a; background: #fff; font: inherit; }
 .newFolderModal input:focus { border-color: #6b9094; box-shadow: 0 0 0 1px rgba(107,144,148,.15); }
 .folderNameField span { position: absolute; right: 8px; color: #8f8f8f; font-size: 10px; line-height: 18px; pointer-events: none; }
+.folderNameError { margin: 0; color: #a20d22; font-size: 10px; line-height: 16px; }
+:root[data-theme='dark'] .folderNameError { color: var(--danger-text); }
 .folderActionModal form { gap: 8px; }
 .newFolderModal .renameFolderButton .icon { filter: brightness(0); }
 .newFolderModal .renameFolderButton:disabled .icon { filter: brightness(0); opacity: .4; }
@@ -719,16 +723,112 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 .srOnly { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
 .settingsPage { width: 100%; min-width: 900px; }
+
+/* One-page workspace registration. */
+.createWorkspaceOverlay { position: fixed; z-index: 1200; inset: 0; padding: 120px 16px 40px; overflow-y: auto; overscroll-behavior: contain; background: #fff; }
+.createWorkspacePage { display: flex; width: min(736px, 100%); flex-direction: column; margin: 0 auto; padding: 0; }
+.createWorkspaceHeader { width: 100%; height: 62px; padding: 0 12px 6px; }
+.createWorkspaceHeader > div { display: flex; flex-direction: column; gap: 2px; }
+.createWorkspaceHeader h1 { margin: 0; padding: 0; font-size: 14px; line-height: 20px; font-weight: 400; }
+.createWorkspaceHeader p { margin: 0; color: #666; font-size: 14px; line-height: 18px; }
+.createWorkspaceBody { display: flex; flex-direction: column; gap: 23.5px; }
+.createWorkspaceGroup { overflow: visible; border: .5px solid rgba(0,0,0,.2); border-radius: 4px; background: #fff; }
+.createWorkspaceGroup > header { display: flex; height: 35px; align-items: center; padding: 8px 12px; border-bottom: .5px solid var(--border); border-radius: 3.5px 3.5px 0 0; background: #f5f5f5; }
+.createWorkspaceGroup > header > div { display: flex; align-items: center; gap: 4px; }
+.createWorkspaceGroup h2 { margin: 0; font-size: 12px; line-height: 18px; font-weight: 400; }
+.createWorkspaceGroup > header span { color: #8f8f8f; font-size: 10px; }
+.createWorkspaceFields { display: grid; grid-template-columns: 464px minmax(0, 1fr); gap: 8px; padding: 12px; }
+.createWorkspaceFields label { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.createWorkspaceFields input { width: 100%; height: 26px; padding: 4px 8px; border: .5px solid rgba(0,0,0,.2); border-radius: 4px; outline: 0; color: #0a0a0a; background: #fff; font: inherit; }
+.createWorkspaceFields input:focus { border-color: #6b9094; box-shadow: 0 0 0 1px rgba(107,144,148,.15); }
+.workspaceUrlPreview { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.workspaceUrlPreview strong { height: 26px; padding: 4px 0; overflow: hidden; border-radius: 4px; color: #525252; background: transparent; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.createWorkspaceInvite { display: flex; flex-direction: column; gap: 8px; padding: 16px 12px 12px; }
+.createWorkspaceInviteHeader { display: flex; height: 18px; align-items: center; justify-content: space-between; }
+.createWorkspaceInviteHeader > div { display: flex; align-items: center; }
+.createWorkspaceInviteHeader > div > span,
+.createWorkspaceInviteNotice { color: #525252; }
+.createWorkspaceInviteHeader .settingsSelectTrigger { height: 18px; gap: 6px; padding: 0; }
+.createWorkspaceDefaultRole .settingsSelectTrigger .settingsIcon:last-child { display: none; }
+.createWorkspaceEmailInput { display: flex; width: 100%; min-height: 70px; flex-direction: column; align-items: stretch; gap: 22px; padding: 6px 7px 6px 8px; border: .5px solid rgba(0,0,0,.2); border-radius: 4px; background: #fff; box-shadow: 0 .5px 1px -1px rgba(0,0,0,.1), inset 0 .5px .5px rgba(255,255,255,.25), inset 0 -.5px .5px rgba(0,0,0,.1); }
+.createWorkspaceEmailInput:focus-within { border-color: #6b9094; box-shadow: 0 0 0 1px rgba(107,144,148,.15); }
+.createWorkspaceEmailInput > input { width: 100%; min-width: 0; height: 18px; padding: 0; border: 0; outline: 0; color: #0a0a0a; background: transparent; box-shadow: none; font: inherit; }
+.createWorkspaceEmailInput > button { display: flex; height: 18px; align-self: flex-end; align-items: center; gap: 6px; padding: 0; border-radius: 4px; color: #0a0a0a; }
+.createWorkspaceEmailInput > button img { display: block; width: 12px; height: 12px; }
+.createWorkspaceEmailPill { display: inline-flex; height: 18px; max-width: 100%; align-items: center; gap: 4px; padding: 1px 6px 1px 8px; border-radius: 999px; background: #f0f0f0; font-size: 10px; line-height: 16px; }
+.createWorkspaceEmailPill button { display: grid; width: 8px; height: 16px; padding: 0; place-items: center; }
+.createWorkspaceEmailPill img { display: block; width: 8px; height: 8px; }
+.createWorkspaceInviteNotice { display: flex; min-height: 34px; align-items: flex-start; gap: 6px; padding: 8px; border: .5px solid rgba(0,0,0,.1); border-radius: 4px; color: #0a0a0a; background: #f5f5f5; font-size: 12px; line-height: 18px; }
+.createWorkspaceInviteNotice img { display: block; width: 12px; height: 12px; flex: 0 0 12px; margin-top: 3px; }
+.createWorkspaceInviteList { display: flex; flex-direction: column; border-top: .5px solid var(--border); }
+.createWorkspaceInviteRow { display: grid; min-height: 60px; grid-template-columns: minmax(0, 1fr) 120px 140px; align-items: stretch; border-bottom: .5px solid var(--border); }
+.createWorkspaceInviteRow:last-child { border-bottom: 0; }
+.createWorkspaceInviteRow > div:first-child { display: flex; min-width: 0; align-items: center; gap: 8px; padding: 16px 12px; }
+.createWorkspaceInviteRow > div > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.createWorkspaceInviteRow em { padding: 4px 6px; border-radius: 999px; color: #d18b0c; background: #fff8e6; font-size: 10px; line-height: 10px; font-style: normal; }
+.createWorkspaceInviteRow > .settingsSelect { width: 120px; height: 60px; align-items: center; padding: 16px 8px; }
+.createWorkspaceInviteRow .settingsSelectTrigger { gap: 6px; padding: 0; }
+.createWorkspaceInviteRow > button { display: grid; width: 18px; height: 18px; align-self: center; justify-self: end; margin-right: 16px; padding: 3px; place-items: center; }
+.createWorkspaceInviteRow > button img { display: block; width: 12px; height: 12px; }
+.createWorkspaceReview { margin: 0; }
+.createWorkspaceReview > div { display: flex; min-height: 42px; align-items: center; justify-content: space-between; gap: 16px; padding: 12px; border-bottom: .5px solid var(--border); }
+.createWorkspaceReview > div:last-child { border-bottom: 0; }
+.createWorkspaceReview dd { margin: 0; color: #525252; }
+.createWorkspaceError { margin: -8px 0 0; padding: 0 12px; color: #a20d22; }
+.createWorkspaceActions { display: flex; justify-content: flex-end; gap: 24px; padding: 12px 12px 0; }
+.createWorkspaceActions button { display: flex; height: 18px; align-items: center; gap: 6px; padding: 0; border-radius: 4px; color: #525252; }
+.createWorkspaceActions .createWorkspaceSubmit { color: #292929; background: transparent; }
+.createWorkspaceActions img { display: block; width: 12px; height: 12px; filter: brightness(0); }
+
+@media (max-width: 760px) {
+  .createWorkspaceOverlay { padding-top: 40px; }
+  .createWorkspaceFields { grid-template-columns: 1fr; }
+  .createWorkspaceInviteRow { grid-template-columns: minmax(0, 1fr) 96px 44px; }
+  .createWorkspaceInviteRow > .settingsSelect { width: 96px; }
+}
+
+:root[data-theme='dark'] .createWorkspacePage { color: #fff; }
+:root[data-theme='dark'] .createWorkspaceOverlay { background: #1f1f1f; }
+:root[data-theme='dark'] .createWorkspaceHeader p,
+:root[data-theme='dark'] .createWorkspaceReview dd,
+:root[data-theme='dark'] .createWorkspaceInviteNotice { color: #a3a3a3; }
+:root[data-theme='dark'] .createWorkspaceGroup { border-color: rgba(255,255,255,.1); background: #1f1f1f; }
+:root[data-theme='dark'] .createWorkspaceGroup > header { border-color: rgba(255,255,255,.1); background: #292929; }
+:root[data-theme='dark'] :is(.createWorkspaceFields input, .createWorkspaceEmailInput) { color: #fff; border-color: rgba(255,255,255,.18); background: #1f1f1f; }
+:root[data-theme='dark'] .workspaceUrlPreview strong { color: #a3a3a3; background: transparent; }
+:root[data-theme='dark'] .createWorkspaceEmailInput > input { color: #fff; background: transparent; }
+:root[data-theme='dark'] .createWorkspaceEmailPill { color: #fff; background: #343434; }
+:root[data-theme='dark'] .createWorkspaceEmailPill img { filter: brightness(0) invert(1); opacity: .82; }
+:root[data-theme='dark'] .createWorkspaceEmailInput > button { color: #fff; }
+:root[data-theme='dark'] .createWorkspaceEmailInput > button img,
+:root[data-theme='dark'] .createWorkspaceDefaultRole .settingsIcon:first-child { filter: brightness(0) invert(1); }
+:root[data-theme='dark'] .createWorkspaceInviteList,
+:root[data-theme='dark'] .createWorkspaceInviteRow { border-color: rgba(255,255,255,.1); }
+:root[data-theme='dark'] .createWorkspaceInviteNotice { color: #fff; border-color: rgba(255,255,255,.1); background: #292929; }
+:root[data-theme='dark'] .createWorkspaceInviteNotice img { filter: brightness(0) invert(1); opacity: .72; }
+:root[data-theme='dark'] .createWorkspaceInviteRow em { color: #f2b84b; background: #302819; }
+:root[data-theme='dark'] .createWorkspaceInviteRow > button img { filter: brightness(0) invert(1); opacity: .64; }
+:root[data-theme='dark'] .createWorkspaceReview > div { border-color: rgba(255,255,255,.1); }
+:root[data-theme='dark'] .createWorkspaceActions button { color: #a3a3a3; }
+:root[data-theme='dark'] .createWorkspaceActions .createWorkspaceSubmit { color: #fff; background: transparent; }
+:root[data-theme='dark'] .createWorkspaceActions .createWorkspaceSubmit img { filter: brightness(0) invert(1); }
 .settingsPageHeader { width: 100%; }
-.settingsLayout { display: grid; width: 100%; grid-template-columns: 168px minmax(0, 1fr); align-items: start; gap: 64px; }
-.settingsNav { position: sticky; top: 0; display: flex; grid-column: 1; grid-row: 1; flex-direction: column; gap: 4px; padding-top: 28px; }
+.settingsPageHeader h1 { margin-bottom: 0; }
+.settingsLayout { display: grid; width: 100%; grid-template-columns: 168px minmax(0, 1fr) minmax(0, 744px) minmax(0, 1fr) 168px; align-items: start; }
+.settingsNav { position: sticky; top: 0; display: flex; grid-column: 1; grid-row: 1; flex-direction: column; gap: 4px; padding-top: 46px; }
 .settingsNav button { display: flex; width: 168px; height: 22px; align-items: center; padding: 2px 8px; border-radius: 4px; text-align: left; }
 .settingsNav button.active, .settingsNav button:hover, .settingsNav button:focus-visible { outline: 0; background: #f0f0f0; }
 .settingsMobileNav { display: none; }
-.settingsContent { display: flex; width: min(968px, calc(100% - 464px)); min-width: 0; grid-column: 1 / -1; grid-row: 1; justify-self: center; flex-direction: column; gap: 23.6px; padding: 22px 0 80px; }
+.settingsContent { display: flex; width: 100%; min-width: 0; grid-column: 3; grid-row: 1; flex-direction: column; gap: 16px; padding: 22px 0 80px; }
 .settingsGroup { scroll-margin-top: 16px; overflow: visible; border: .5px solid rgba(0,0,0,.2); border-radius: 4px; background: #fff; }
 .settingsGroup:has(.settingsSelect.open) { position: relative; z-index: 20; }
 .settingsGroup > header { height: 35px; padding: 8px 12px; border-bottom: .5px solid var(--border); border-radius: 3.5px 3.5px 0 0; background: #f5f5f5; background-clip: padding-box; }
+.workspaceMembersGroup > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.workspaceMembersGroup > header > div { display: flex; min-width: 0; align-items: center; gap: 8px; }
+.workspaceMembersGroup > header > div > span,
+.settingsHeaderMeta { color: #7a7a7a; font-size: 10px; }
+.inviteMembersButton { display: flex; height: 18px; align-items: center; gap: 6px; padding: 0; color: #525252; }
+.inviteMembersButton:focus-visible { outline: 1px solid #6b9094; outline-offset: 2px; }
 .settingsGroup h2 { margin: 0; font-size: 12px; line-height: 18px; font-weight: 400; }
 .settingsRow { display: flex; min-height: 42px; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-bottom: .5px solid var(--border); }
 .settingsRow:last-child { border-bottom: 0; }
@@ -786,6 +886,110 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 .settingsStorageTrack span { display: block; width: 25%; height: 100%; border-radius: inherit; background: #6b9094; box-shadow: 0 .5px 1px rgba(0,0,0,.2), 0 1px 2px -1px rgba(0,0,0,.1), inset 0 .5px .5px rgba(255,255,255,.1), inset 0 -.5px .5px rgba(0,0,0,.1); }
 .settingsInlineAction { display: flex; height: 26px; align-items: center; gap: 6px; padding: 4px 0; border-radius: 4px; }
 .settingsStaticValue { color: #525252; }
+.workspaceAccessNotice { display: flex; min-height: 54px; align-items: center; justify-content: space-between; gap: 20px; padding: 10px 12px; border: .5px solid rgba(107,144,148,.35); border-radius: 4px; background: #f3f7f7; }
+.workspaceAccessNotice > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.workspaceAccessNotice strong { font-weight: 400; }
+.workspaceAccessNotice span { color: #525252; }
+.workspaceRoleBadge { display: inline-flex; height: 18px; flex: 0 0 auto; align-items: center; padding: 1px 6px; border-radius: 999px; color: #456b70; background: #e5eeee; font-size: 10px; line-height: 16px; }
+.memberInvite { position: relative; display: grid; min-height: 70px; grid-template-columns: minmax(180px, 1fr) minmax(360px, 1.35fr); align-items: center; gap: 16px; padding: 12px; border-bottom: .5px solid var(--border); }
+.memberInvite > div:first-child { display: flex; flex-direction: column; gap: 2px; }
+.memberInvite label { color: #0a0a0a; }
+.memberInvite small { color: #525252; }
+.memberInviteControls { display: grid; grid-template-columns: minmax(180px, 1fr) auto auto; align-items: center; gap: 8px; }
+.memberInviteControls > input { width: 100%; height: 26px; padding: 4px 8px; border: .5px solid rgba(0,0,0,.2); border-radius: 4px; outline: 0; color: #0a0a0a; background: #fff; font: inherit; }
+.memberInviteControls > input:focus { border-color: #6b9094; box-shadow: 0 0 0 1px rgba(107,144,148,.12); }
+.memberInviteControls > button { height: 26px; padding: 4px 10px; border-radius: 4px; color: #fff; background: #525252; }
+.memberInviteError { position: absolute; right: 12px; bottom: 2px; color: #a20d22; font-size: 10px; }
+.memberList { display: flex; flex-direction: column; border-radius: 0 0 3.5px 3.5px; }
+.memberRow { display: grid; min-height: 60px; grid-template-columns: minmax(0, 1fr) 120px 140px; align-items: stretch; border-bottom: .5px solid rgba(0,0,0,.1); background: #fff; }
+.memberRow:last-child { border-bottom: .5px solid rgba(0,0,0,.2); border-radius: 0 0 3.5px 3.5px; }
+.memberPrimary { display: flex; min-width: 0; align-items: center; gap: 8px; overflow: hidden; padding: 16px 12px; }
+.workspaceAvatar { display: grid; width: 28px; height: 28px; flex: 0 0 28px; place-items: center; border: .5px solid rgba(0,0,0,.1); border-radius: 50%; color: #f8fbfb; background-color: #6b9094; background-image: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.35) 100%); text-align: center; text-shadow: 0 .7px .5px rgba(0,0,0,.25); font-size: 10px; line-height: 18px; }
+.workspaceAvatar.variant1 { background-color: #f24b0d; }
+.workspaceAvatar.variant2 { background-color: #918e6e; }
+.workspaceAvatar.variant3 { background-color: #8989a9; }
+.memberIdentity { display: flex; min-width: 0; flex-direction: column; }
+.memberIdentity > div { display: flex; min-width: 0; align-items: center; gap: 6px; }
+.memberIdentity strong { overflow: hidden; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.memberIdentity span { overflow: hidden; color: #7a7a7a; text-overflow: ellipsis; white-space: nowrap; }
+.memberOwnerBadge { padding: 1px 5px; border-radius: 999px; color: #7a7a7a; background: #f0f0f0; font-size: 9px; line-height: 14px; }
+.memberStatus { padding: 4px 6px; border-radius: 999px; color: #d18b0c !important; background: #fff8e6; font-size: 10px; line-height: 10px; }
+.memberRoleCell { display: flex; width: 120px; align-items: center; padding: 16px 8px; }
+.memberRoleSelect .settingsSelectTrigger { gap: 6px; padding: 0; }
+.memberRoleSelect .settingsSelectTrigger .settingsIcon:last-child { margin-left: 0; }
+.memberActions { display: flex; width: 140px; align-items: center; justify-content: flex-end; gap: 8px; padding: 16px 12px 16px 8px; }
+.memberRole { color: #525252; }
+.memberEdit,
+.memberRemove,
+.memberResend,
+.memberPendingRemove { display: grid; width: 18px; height: 18px; padding: 3px; place-items: center; }
+.memberActions img { display: block; width: 12px; height: 12px; }
+.memberActionTooltip { position: relative; }
+.memberActionTooltip::before { position: absolute; z-index: 40; right: -6px; bottom: calc(100% + 7px); padding: 4px 8px; transform: translateY(2px); border: .5px solid rgba(255,255,255,.14); border-radius: 6px; opacity: 0; color: #fff; background: #3d3d3d; box-shadow: 0 1px 2px rgba(0,0,0,.18), 0 4px 8px -4px rgba(0,0,0,.2), inset 0 .5px .5px rgba(255,255,255,.12); font-size: 12px; line-height: 18px; font-weight: 400; white-space: nowrap; pointer-events: none; transition: opacity 120ms ease, transform 120ms ease; content: attr(data-tooltip); }
+.memberActionTooltip::after { position: absolute; z-index: 40; right: 3px; bottom: calc(100% + 3px); width: 8px; height: 8px; transform: translateY(2px) rotate(45deg); border-right: .5px solid rgba(255,255,255,.14); border-bottom: .5px solid rgba(255,255,255,.14); opacity: 0; background: #3d3d3d; pointer-events: none; transition: opacity 120ms ease, transform 120ms ease; content: ''; }
+.memberActionTooltip:hover::before,
+.memberActionTooltip:hover::after,
+.memberActionTooltip:focus-visible::before,
+.memberActionTooltip:focus-visible::after { transform: translateY(0) rotate(0); opacity: 1; }
+.memberActionTooltip:hover::after,
+.memberActionTooltip:focus-visible::after { transform: translateY(0) rotate(45deg); }
+.memberEdit:focus-visible,
+.memberRemove:focus-visible,
+.memberResend:focus-visible,
+.memberPendingRemove:focus-visible { outline: 1px solid currentColor; outline-offset: 2px; }
+.memberRemoveModal > div { min-height: 126px; }
+.memberRemoveModal > div footer { display: flex; width: 100%; justify-content: flex-end; gap: 16px; }
+.memberRemoveModal > div footer .memberRemoveConfirm { color: #e51d31; }
+.memberEditModal > div { gap: 28px; }
+.memberEditModalRow { display: flex; min-height: 42px; align-items: center; justify-content: space-between; gap: 24px; }
+.memberEditModalRow > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.memberEditModalRow strong { overflow: hidden; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.memberEditModalRow span { overflow: hidden; color: #7a7a7a; text-overflow: ellipsis; white-space: nowrap; }
+.memberEditModal > div footer { display: flex; justify-content: flex-end; gap: 20px; }
+.memberEditModal > div footer button { padding: 0; color: #525252; }
+.memberEditModal > div footer .memberEditSave { color: #129457; }
+.inviteMembersModal h2 { display: flex; align-items: center; gap: 6px; }
+.inviteMembersModal h2 img { display: block; width: 12px; height: 12px; }
+.inviteMembersModal { width: min(480.4px, calc(100vw - 48px)); }
+.inviteMembersModal > form { gap: 40px; padding: 12px; border: 0; border-top: .5px solid #dcdcdc; border-radius: 6px; background: #fff; box-shadow: inset 0 -.5px .5px rgba(0,0,0,.1); }
+.inviteMembersField { position: relative; display: flex; min-height: 0; flex-direction: column; gap: 4px; }
+.inviteMembersFieldHeader { display: flex; height: 18px; align-items: center; justify-content: space-between; }
+.inviteMembersFieldHeader > div { display: flex; align-items: center; gap: 6px; }
+.inviteMembersFieldHeader > div > span { color: #8f8f8f; }
+.inviteMembersFieldHeader .settingsSelect,
+.inviteMembersFieldHeader .settingsSelectTrigger { height: 18px; }
+.inviteMembersFieldHeader .settingsSelectTrigger { gap: 6px; padding: 0; border-radius: 0; }
+.inviteMembersFieldHeader .settingsSelectTrigger .settingsIcon:last-child { width: 12px; height: 12px; flex-basis: 12px; margin-left: 0; }
+.inviteMembersFieldHeader .settingsSelectMenu { top: calc(100% + 4px); right: 0; left: auto; min-width: 112px; }
+.inviteEmailInput { display: flex; width: 100%; min-height: 48px; align-content: flex-start; align-items: center; flex-wrap: wrap; gap: 4px; padding: 4px 8px; overflow: hidden; border: .5px solid rgba(0,0,0,.2); border-radius: 4px; color: #0a0a0a; background: #fff; box-shadow: 0 .5px 1px -1px rgba(0,0,0,.1), inset 0 .5px .5px rgba(255,255,255,.25), inset 0 -.5px .5px rgba(0,0,0,.1); cursor: text; }
+.inviteEmailInput:focus-within { border-color: #6b9094; box-shadow: 0 0 0 1px rgba(107,144,148,.15); }
+.inviteMembersModal .inviteEmailInput > input { width: 40px; min-width: 20px; height: 18px; flex: 1 1 40px; padding: 0; border: 0; border-radius: 0; outline: 0; color: inherit; background: transparent; box-shadow: none; font: inherit; line-height: 18px; }
+.inviteMembersModal .inviteEmailInput > input:focus { border: 0; outline: 0; box-shadow: none; }
+.inviteEmailInput:not(:has(.inviteEmailPill)) > input { width: 100%; min-width: 100%; flex-basis: 100%; }
+.inviteEmailInput > input::placeholder { color: #a3a3a3; opacity: 1; }
+.inviteEmailPill { display: inline-flex; height: 18px; max-width: 100%; flex: 0 0 auto; align-items: center; gap: 4px; padding: 1px 6px 1px 8px; border-radius: 999px; background: #f0f0f0; font-size: 10px; line-height: 16px; }
+.inviteEmailPill > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inviteEmailPill > button { display: grid; width: 8px; height: 16px; flex: 0 0 8px; padding: 0; place-items: center; }
+.inviteEmailPill img { display: block; width: 8px; height: 8px; }
+.inviteMembersModal footer { display: flex; justify-content: flex-end; gap: 20px; }
+.inviteMembersModal footer button { display: flex; height: 18px; align-items: center; gap: 6px; padding: 0; color: #525252; }
+.inviteMembersModal footer .sendInvitation { color: #0a0a0a; }
+.inviteMembersModal footer img { display: block; width: 12px; height: 12px; }
+.inviteMembersError { position: absolute; top: calc(100% + 2px); left: 0; color: #a20d22; font-size: 10px; line-height: 14px; }
+
+/* Shared dialog shell from Figma 858:46628. Component-specific bodies keep their own layout. */
+:is(.newFolderModal, .deleteItemModal, .billingConfirmModal, .activityModal, .infoModal, .settingsReviewModal) {
+  border-width: .5px;
+  border-color: #dcdcdc;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.1), 0 4px 8px -4px rgba(0,0,0,.08), 0 6px 12px -6px rgba(0,0,0,.06), 0 8px 16px -6px rgba(0,0,0,.04), inset 0 -.5px .5px rgba(0,0,0,.1);
+}
+:is(.newFolderBackdrop, .billingModalBackdrop, .activityModalBackdrop) {
+  padding: 24px;
+  background: rgba(0,0,0,.05);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
 .settingsGroup.danger { overflow: hidden; border-color: rgba(0,0,0,.1); background: #e51d31; }
 .settingsGroup.danger > header { border-bottom-color: #ce1a2c; border-radius: 0; background: #fff0f1; }
 .settingsGroup.danger .settingsRow { min-height: 60px; border: 0; border-radius: 0; background: #fff; }
@@ -841,6 +1045,7 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
   .settingsMobileNav .settingsIcon { position: absolute; right: 8px; pointer-events: none; }
   .settingsContent { width: 100%; grid-column: auto; grid-row: auto; padding-top: 0; }
   .content:has(.settingsPage) { overflow-x: hidden; }
+  .memberInvite { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {
@@ -848,9 +1053,17 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
   .settingsRowControl { max-width: 100%; }
   .settingsSelectMenu { right: 0; max-width: calc(100vw - 32px); }
   .settingsUnsavedBar { right: 8px; bottom: 8px; width: calc(100vw - 16px); max-width: none; }
+  .memberInviteControls { grid-template-columns: minmax(0, 1fr) auto; }
+  .memberInviteControls > input { grid-column: 1 / -1; }
+  .memberRow { grid-template-columns: minmax(0, 1fr) 96px; }
+  .memberPrimary { grid-column: 1 / -1; padding-bottom: 4px; }
+  .memberRoleCell { width: 96px; padding-top: 4px; }
+  .memberActions { width: auto; padding-top: 4px; }
 }
 
 .apiKeysPage { --api-select-width: 132px; --api-expires-width: 218px; --api-create-width: 132px; width: 100%; }
+.apiWorkspaceContext { margin: -10px 0 12px; padding-left: 8px; color: #7a7a7a; font-size: 10px; line-height: 14px; }
+.apiReadOnlyNotice { margin: 0 0 16px; padding: 10px 12px; border: .5px solid rgba(107,144,148,.35); border-radius: 4px; color: #525252; background: #f3f7f7; }
 .apiKeyForm { display: flex; width: 100%; flex-direction: column; margin: 0 0 24px; }
 .apiKeysPage:has(.apiCreationBanner) .apiKeyForm { margin-bottom: 21.5px; }
 .apiKeyFields { display: grid; width: 100%; grid-template-columns: minmax(120px, 1fr) var(--api-select-width) var(--api-select-width) var(--api-expires-width) var(--api-create-width); align-items: flex-start; gap: 8px; }
@@ -931,8 +1144,9 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 .apiCreatedKeyField button { display: flex; width: 12px; height: 12px; flex: 0 0 12px; align-items: center; justify-content: center; padding: 0; }
 .apiCreatedKeyField img { display: block; width: 12px; height: 12px; }
 .apiCreatedKeyField .apiBannerHideIcon { filter: brightness(0) invert(1); }
-.apiKeysEmptyState { display: flex; width: 100%; flex-direction: column; align-items: center; padding-top: 96.5px; text-align: center; }
-.apiKeysEmptyState > img { display: block; width: 229px; height: 288px; flex: 0 0 288px; }
+.apiKeysEmptyState { display: flex; width: 100%; flex-direction: column; align-items: center; padding-top: 96.5px; text-align: center; background: transparent; }
+.apiKeysEmptyState > .apiKeysEmptyIllustration { display: block; width: 229px; height: 288px; flex: 0 0 288px; object-fit: contain; }
+.apiKeysEmptyState > .apiKeysEmptyIllustrationDark { display: none; }
 .apiKeysEmptyState > div { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 16px; color: #0a0a0a; white-space: nowrap; }
 .apiKeysEmptyState h2 { margin: 0; font-size: 14px; line-height: 20px; font-weight: 500; }
 .apiKeysEmptyState p { margin: 0; font-size: 12px; line-height: 18px; font-weight: 400; }
@@ -955,6 +1169,7 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 }
 .emptyBeamState { display: flex; width: 100%; height: calc(100dvh - 62px); min-height: 0; flex-direction: column; align-items: center; justify-content: center; gap: 24px; text-align: center; }
 .emptyBeamIllustration { display: block; width: 228.863px; height: 250px; object-fit: contain; }
+.emptyBeamIllustrationDark { display: none; }
 .emptyBeamCopy { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #000; }
 .emptyBeamCopy h2 { margin: 0; font-size: 14px; line-height: 20px; font-weight: 500; }
 .emptyBeamCopy p { margin: 0; font-size: 12px; line-height: 18px; }
@@ -1040,6 +1255,7 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 .folderDetail { width: 100%; height: 100%; }
 .detailEmptyState { display: flex; width: 100%; height: calc(100dvh - 62px); min-height: 0; flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-align: center; }
 .detailEmptyIllustration { display: block; width: 229px; height: 288px; object-fit: contain; }
+.detailEmptyIllustrationDark { display: none; height: 250px; }
 .detailEmptyCopy { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #000; }
 .detailEmptyCopy h2 { margin: 0; font-size: 14px; line-height: 20px; font-weight: 500; }
 .detailEmptyCopy p { margin: 0; font-size: 12px; line-height: 18px; }
@@ -1086,6 +1302,10 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 .viewTabs { position: relative; display: flex; align-items: center; gap: 0; padding: 2px; overflow: hidden; border: .5px solid var(--border); border-radius: 6px; background: #f5f5f5; box-shadow: inset 0 .5px .5px rgba(255,255,255,.6); }
 .viewTabs button { position: relative; display: flex; height: 22px; align-items: center; justify-content: center; gap: 6px; padding: 2px 8px; border: .5px solid transparent; border-radius: 4px; color: #8f8f8f; }
 .viewTabs button.active { border-color: var(--border); color: #0a0a0a; background: #fff; box-shadow: inset 0 0 0 .2px rgba(0,0,0,.15), inset 0 .5px .5px rgba(255,255,255,.6), inset 0 -.5px .5px rgba(0,0,0,.5); }
+.viewTabs button .icon { filter: brightness(0); opacity: .36; }
+.viewTabs button.active .icon { filter: brightness(0); opacity: 1; }
+.viewTabs button:not(.active):hover { color: #525252; background: rgba(0,0,0,.04); }
+.viewTabs button:focus-visible { outline: 1px solid #6b9094; outline-offset: -1px; }
 .detailTable { width: 100%; }
 .fileGrid { display: flex; width: 100%; flex-wrap: wrap; align-content: flex-start; align-items: flex-start; gap: 16px; }
 .fileGridCard { display: flex; width: 136.667px; height: 102px; flex: 0 0 136.667px; flex-direction: column; align-items: center; justify-content: center; padding: 0; overflow: hidden; border-radius: 4px; color: #0a0a0a; background: transparent; }
@@ -1360,9 +1580,12 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 :root[data-theme='dark'] .detailRow.selectable:hover,
 :root[data-theme='dark'] .detailRow.selectable.selected { background: #292929; }
 :root[data-theme='dark'] .detailRow .moreButton .icon { filter: none; opacity: .82; }
-:root[data-theme='dark'] .viewTabs { border-color: rgba(255,255,255,.1); background: #292929; box-shadow: none; }
+:root[data-theme='dark'] .viewTabs { border-color: rgba(255,255,255,.1); background: #3d3d3d; box-shadow: inset 0 .5px .5px rgba(255,255,255,.6); }
 :root[data-theme='dark'] .viewTabs button { color: #a3a3a3; }
-:root[data-theme='dark'] .viewTabs button.active { color: #fff; border-color: rgba(255,255,255,.1); background: #1f1f1f; box-shadow: inset 0 .5px .5px rgba(255,255,255,.1),inset 0 -.5px .5px rgba(0,0,0,.5); }
+:root[data-theme='dark'] .viewTabs button .icon { filter: brightness(0) invert(1); opacity: .6; }
+:root[data-theme='dark'] .viewTabs button.active { color: #fff; border-color: rgba(255,255,255,.1); background: linear-gradient(180deg, rgba(255,255,255,.1), transparent), rgba(255,255,255,.1); box-shadow: inset 0 0 0 .2px rgba(255,255,255,.15), inset 0 -.5px .5px rgba(0,0,0,.6), inset 0 .5px .5px rgba(255,255,255,.5); }
+:root[data-theme='dark'] .viewTabs button.active .icon { filter: brightness(0) invert(1); opacity: 1; }
+:root[data-theme='dark'] .viewTabs button:not(.active):hover { color: #fff; background: rgba(255,255,255,.06); }
 :root[data-theme='dark'] .fileGridCard { color: #fff; }
 :root[data-theme='dark'] .fileGridCard:hover,
 :root[data-theme='dark'] .fileGridCard.selected { background: #292929; }
@@ -1446,7 +1669,6 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 :root[data-theme='dark'] .sidebar .accountRow.active,
 :root[data-theme='dark'] .settingsNav button.active,
 :root[data-theme='dark'] .accountSectionNav button.active,
-:root[data-theme='dark'] .viewTabs button.active,
 :root[data-theme='dark'] .searchFilters button.active,
 :root[data-theme='dark'] .billingCycleSwitch button.active {
   color: #fff;
@@ -1457,7 +1679,6 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 :root[data-theme='dark'] .sidebar .accountRow:hover,
 :root[data-theme='dark'] .settingsNav button:hover,
 :root[data-theme='dark'] .accountSectionNav button:hover,
-:root[data-theme='dark'] .viewTabs button:hover,
 :root[data-theme='dark'] .searchFilters button:hover { background: #292929; }
 
 /* Keep the API key composer within the same dark field system as sidebar search. */
@@ -1684,12 +1905,12 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 :root[data-theme='dark'] .apiStatusBadge.revoked { color: #a3a3a3; background: #292929; }
 :root[data-theme='dark'] .billingCancelPlan > button,
 :root[data-theme='dark'] .subscriptionActionButtons .cancelSubscriptionButton {
-  color: #ff5a68;
-  border-color: rgba(255, 90, 104, 0.65);
+  color: var(--danger-text);
+  border-color: var(--danger-border);
   background: transparent;
 }
 :root[data-theme='dark'] .billingCancelPlan > button:hover,
-:root[data-theme='dark'] .subscriptionActionButtons .cancelSubscriptionButton:hover { background: rgba(229, 29, 49, 0.12); }
+:root[data-theme='dark'] .subscriptionActionButtons .cancelSubscriptionButton:hover { background: var(--danger-surface); }
 
 /* Dialogs and overlays use the same two-surface hierarchy as the page. */
 :root[data-theme='dark'] :where(
@@ -1754,10 +1975,14 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 
 /* API states and content-preview surfaces. */
 :root[data-theme='dark'] .apiKeysEmptyState > div { color: #fff; }
+:root[data-theme='dark'] .apiKeysEmptyState > .apiKeysEmptyIllustrationLight { display: none; }
+:root[data-theme='dark'] .apiKeysEmptyState > .apiKeysEmptyIllustrationDark { display: block; }
+:root[data-theme='dark'] .apiWorkspaceContext { color: #a3a3a3; }
+:root[data-theme='dark'] .apiReadOnlyNotice { color: #a3a3a3; border-color: rgba(107,144,148,.5); background: #232a2b; }
 :root[data-theme='dark'] .apiKeyValue { color: #a3a3a3; }
 :root[data-theme='dark'] .apiStatusBadge.expiring-soon,
 :root[data-theme='dark'] .billingPage .billingInvoiceRow em.refunded { color: #f2b84b; background: #302819; }
-:root[data-theme='dark'] .apiStatusBadge.expired { color: #ff7a86; background: #321b1e; }
+:root[data-theme='dark'] .apiStatusBadge.expired { color: var(--danger-text); background: var(--danger-surface); }
 :root[data-theme='dark'] .previewToolbar,
 :root[data-theme='dark'] .previewDocument,
 :root[data-theme='dark'] .previewLoadState { border-color: rgba(255, 255, 255, 0.1); }
@@ -1778,23 +2003,23 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 :root[data-theme='dark'] .settingsGroup.danger > header,
 :root[data-theme='dark'] .profileDanger > header { border-color: rgba(229, 29, 49, 0.5); background: #321b1e; }
 :root[data-theme='dark'] .settingsGroup.danger .settingsRow { background: #1f1f1f; }
-:root[data-theme='dark'] .settingsDangerButton { color: #ff5a68; background: transparent; }
+:root[data-theme='dark'] .settingsDangerButton { color: var(--danger-text); background: transparent; }
 :root[data-theme='dark'] .settingsGroup.danger .settingsRowLabel small { color: var(--text-secondary); }
 :root[data-theme='dark'] .settingsDangerButton .settingsIcon {
   filter: none;
   opacity: 1;
 }
 :root[data-theme='dark'] .profileGroup.profileDanger {
-  border-color: rgba(229, 29, 49, 0.5);
+  border-color: var(--danger-border);
 }
 :root[data-theme='dark'] .profileDanger .profileRow {
-  border-color: rgba(229, 29, 49, 0.5);
+  border-color: var(--danger-border);
   background: #1f1f1f;
 }
 :root[data-theme='dark'] .profileDanger .profileRow small { color: var(--text-secondary); }
 :root[data-theme='dark'] .profileDelete {
   height: 30px;
-  color: #ff5a68;
+  color: var(--danger-text);
   background: transparent;
 }
 :root[data-theme='dark'] .profileDelete img {
@@ -1802,8 +2027,8 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
   opacity: 1;
 }
 :root[data-theme='dark'] :where(.settingsDataError, .settingsReviewError, .apiRevokeContent .apiRevokeError) {
-  color: #ff7a86;
-  background: #321b1e;
+  color: var(--danger-text);
+  background: var(--danger-surface);
 }
 
 /* Secondary strips, badges and disabled states found during the second pass. */
@@ -1967,6 +2192,14 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
   filter: none;
   opacity: 0.82;
 }
+:root[data-theme='dark'] .sidebar .workspaceName .organizationAvatar {
+  border-color: rgba(0, 0, 0, 0.08);
+  background: #f5f5f5;
+}
+:root[data-theme='dark'] .sidebar .workspaceName .organizationAvatar .icon {
+  filter: none;
+  opacity: 1;
+}
 :root .sidebar .organizationMenu .organizationOption > .icon:last-child {
   filter: none;
   opacity: 1;
@@ -1984,6 +2217,10 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 :root[data-theme='dark'] :where(.detailEmptyCopy h2, .detailEmptyUpload, .emptyBeamCopy h2, .emptyBeamCreate) {
   color: #fff;
 }
+:root[data-theme='dark'] .detailEmptyIllustrationLight { display: none; }
+:root[data-theme='dark'] .detailEmptyIllustrationDark { display: block; }
+:root[data-theme='dark'] .emptyBeamIllustrationLight { display: none; }
+:root[data-theme='dark'] .emptyBeamIllustrationDark { display: block; }
 :root[data-theme='dark'] :where(.detailEmptyCopy p, .emptyBeamCopy p) {
   color: var(--text-secondary);
 }
@@ -2195,7 +2432,7 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 :root[data-theme='dark'] .deleteItemContent p { color: #fff; }
 :root[data-theme='dark'] .deleteItemContent footer { gap: 20px; }
 :root[data-theme='dark'] .deleteItemContent footer button { color: #a3a3a3; }
-:root[data-theme='dark'] .deleteItemContent footer .deleteItemConfirm { color: #f13546; }
+:root[data-theme='dark'] .deleteItemContent footer .deleteItemConfirm { color: var(--danger-text); }
 
 /* Shared dark modal language derived from the deletion alert. */
 :root[data-theme='dark'] :is(
@@ -2300,7 +2537,12 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
   .billingPaymentCard .dangerText,
   .receiptRecipient button,
   .billingFieldError,
+  .profileFieldError,
+  .createWorkspaceError,
   .workspaceNameError,
+  .memberInviteError,
+  .inviteMembersError,
+  .memberRemoveModal .memberRemoveConfirm,
   .apiNameError,
   .apiStatusBadge.expired,
   .apiRevokeActions .dangerModalButton,
@@ -2370,6 +2612,22 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 :root[data-theme='dark'] :is(.settingsDangerButton .settingsIcon, .profileDelete img) {
   display: none;
 }
+
+/* Destructive member actions use the same dark-theme red as every danger dialog. */
+:root[data-theme='dark'] .memberRemove {
+  position: relative;
+}
+
+:root[data-theme='dark'] .memberRemove::before {
+  width: 12px;
+  height: 12px;
+  background: var(--danger-text);
+  content: '';
+  -webkit-mask: url('/assets/member-trash.svg') center / 12px 12px no-repeat;
+  mask: url('/assets/member-trash.svg') center / 12px 12px no-repeat;
+}
+
+:root[data-theme='dark'] .memberRemove img { display: none; }
 
 /* The account popover is always dark, so its usage affordance is always white. */
 :root .sidebar .accountMenu .accountUsageMeta button .icon {
@@ -2778,3 +3036,80 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
   opacity: 1;
 }
 :root[data-theme='dark'] .settingsUtilityContent footer button { color: #fff; }
+
+/* Workspace membership and access — shared structure with theme-scoped surfaces. */
+:root[data-theme='dark'] .settingsPageHeader p,
+:root[data-theme='dark'] .workspaceMembersGroup > header > div > span,
+:root[data-theme='dark'] .settingsHeaderMeta,
+:root[data-theme='dark'] .memberIdentity span,
+:root[data-theme='dark'] .memberRole { color: #a3a3a3; }
+:root[data-theme='dark'] .inviteMembersButton { color: #a3a3a3; }
+:root[data-theme='dark'] .inviteMembersButton .settingsIcon,
+:root[data-theme='dark'] .memberEdit .settingsIcon { filter: brightness(0) invert(1); opacity: .64; }
+:root[data-theme='dark'] .workspaceAccessNotice {
+  color: #fff;
+  border-color: rgba(107,144,148,.5);
+  background: #232a2b;
+}
+:root[data-theme='dark'] .workspaceAccessNotice span { color: #a3a3a3; }
+:root[data-theme='dark'] .workspaceRoleBadge,
+:root[data-theme='dark'] .workspaceAvatar { border-color: rgba(255,255,255,.1); }
+:root[data-theme='dark'] .memberInvite,
+:root[data-theme='dark'] .memberRow { border-color: rgba(255,255,255,.1); background: #1f1f1f; }
+:root[data-theme='dark'] .memberRow:last-child { border-bottom-color: rgba(255,255,255,.1); }
+:root[data-theme='dark'] .memberInvite label,
+:root[data-theme='dark'] .memberIdentity strong { color: #fff; }
+:root[data-theme='dark'] .memberInvite small { color: #a3a3a3; }
+:root[data-theme='dark'] .memberInviteControls > input {
+  color: #fff;
+  border-color: rgba(255,255,255,.18);
+  background: #1f1f1f;
+}
+:root[data-theme='dark'] .memberInviteControls > input::placeholder { color: var(--placeholder-text); }
+:root[data-theme='dark'] .memberInviteControls > button { color: #0a0a0a; background: #f5f5f5; }
+:root[data-theme='dark'] :is(.inviteMembersButton > img, .memberEdit img, .memberResend img) { filter: brightness(0) invert(1); opacity: .64; }
+:root[data-theme='dark'] .memberStatus { color: #f2c75c; background: #352b12; }
+:root[data-theme='dark'] .memberOwnerBadge { color: #a3a3a3; background: #343434; }
+:root[data-theme='dark'] .memberRemove,
+:root[data-theme='dark'] .memberInviteError,
+:root[data-theme='dark'] .memberRemoveModal > div footer .memberRemoveConfirm { color: var(--danger-text); }
+:root[data-theme='dark'] .memberEditModalRow span,
+:root[data-theme='dark'] .memberEditModal > div footer button { color: var(--text-muted); }
+:root[data-theme='dark'] .memberEditModal > div footer .memberEditSave { color: #41cb85; }
+
+/* Final shared modal standard — Figma 858:46628. */
+:root:not([data-theme='dark']) :is(.newFolderModal, .deleteItemModal, .billingConfirmModal, .activityModal, .infoModal, .settingsReviewModal) {
+  border: .5px solid #dcdcdc;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.1), 0 4px 8px -4px rgba(0,0,0,.08), 0 6px 12px -6px rgba(0,0,0,.06), 0 8px 16px -6px rgba(0,0,0,.04), inset 0 -.5px .5px rgba(0,0,0,.1);
+}
+:root:not([data-theme='dark']) :is(.newFolderBackdrop, .billingModalBackdrop, .activityModalBackdrop) {
+  padding: 24px;
+  background: rgba(0,0,0,.05);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+:root:not([data-theme='dark']) .billingConfirmModal { width: min(480.4px, calc(100vw - 48px)); border-radius: 8px; background: #f5f5f5; }
+:root:not([data-theme='dark']) .billingConfirmModal > header { min-height: 34px; padding: 8px 8px 8px 12px; border-bottom: 0; background: #f5f5f5; }
+:root:not([data-theme='dark']) .billingConfirmModal h2 { font-size: 12px; line-height: 18px; }
+
+:root[data-theme='dark'] .inviteEmailInput {
+  color: #fff;
+  border-color: rgba(255,255,255,.18);
+  background: #1f1f1f;
+  box-shadow: inset 0 .5px .5px rgba(255,255,255,.06), inset 0 -.5px .5px rgba(0,0,0,.5);
+}
+:root[data-theme='dark'] .inviteMembersModal > form {
+  border: 0;
+  border-top: .5px solid rgba(255,255,255,.1);
+  background: #292929;
+  box-shadow: 0 -2px 20px -6px rgba(0,0,0,.5), inset 0 -.5px .5px rgba(0,0,0,.1);
+}
+:root[data-theme='dark'] .inviteEmailInput > input::placeholder,
+:root[data-theme='dark'] .inviteMembersFieldHeader > div > span,
+:root[data-theme='dark'] .inviteMembersModal footer button { color: #a3a3a3; }
+:root[data-theme='dark'] .inviteEmailPill { color: #fff; background: #343434; }
+:root[data-theme='dark'] .inviteEmailPill img { filter: brightness(0) invert(1); opacity: .82; }
+:root[data-theme='dark'] .inviteMembersModal footer .sendInvitation { color: #fff; }
+:root[data-theme='dark'] .inviteMembersModal :is(header img, footer img) { filter: brightness(0) invert(1); opacity: .82; }
+:root[data-theme='dark'] .inviteMembersError { color: var(--danger-text); }

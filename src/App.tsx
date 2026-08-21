@@ -3,6 +3,7 @@ import ApiKeysPage from './components/ApiKeysPage'
 import SettingsPage from './components/SettingsPage'
 import AccountProfilePage from './components/AccountProfilePage'
 import BillingUsagePage from './components/BillingUsagePage'
+import CreateWorkspacePage from './components/CreateWorkspacePage'
 
 const icons = {
   personal: '/assets/personal.svg',
@@ -37,8 +38,8 @@ const icons = {
   downloadSuccess: '/assets/download-success.svg',
   previewDownload: '/assets/preview-download.svg',
   previewRetry: '/assets/preview-retry.svg',
-  viewList: '/assets/view-list.svg',
-  viewGrid: '/assets/view-grid.svg',
+  viewList: '/assets/view-list-tabs.svg',
+  viewGrid: '/assets/view-grid-tabs.svg',
   fileDocument: '/assets/file-document.svg',
   emptyFolders: '/assets/empty-folders.svg',
   emptyFiles: '/assets/empty-files.svg',
@@ -55,6 +56,8 @@ type FileKind = 'folder' | 'file'
 type FileRow = { name: string; size: string; modified: string; badge?: string; kind: FileKind }
 type AppView = 'home' | 'folder' | 'apiKeys' | 'settings' | 'account' | 'billing'
 type AppearanceTheme = 'light' | 'dark' | 'system'
+const accountEmail = 'michele@beam.app'
+const readAccountName = () => window.localStorage.getItem('beam-account-display-name') || 'Michele J.'
 
 const readAppearanceTheme = (): AppearanceTheme => {
   const saved = window.localStorage.getItem('beam-appearance-theme')
@@ -104,18 +107,58 @@ const initialFolderContents: Record<string, FolderFile[]> = {
   ],
 }
 
-const organizations = [
-  { name: 'Personal', icon: icons.avatar, personal: true },
-  { name: 'Company ABC', icon: icons.companyAbc, personal: false },
-  { name: 'Company XYZ', icon: icons.companyXyz, personal: false },
-] as const
+type WorkspaceContent = { folders: Folder[]; files: FileRow[]; folderContents: Record<string, FolderFile[]> }
+const populatedWorkspaceContent = (): WorkspaceContent => ({
+  folders: folders.map((folder) => ({ ...folder })),
+  files: files.map((file) => ({ ...file })),
+  folderContents: Object.fromEntries(Object.entries(initialFolderContents).map(([name, items]) => [name, items.map((item) => ({ ...item }))])),
+})
+const initialWorkspaceContent: Record<string, WorkspaceContent> = {
+  personal: populatedWorkspaceContent(),
+  'company-abc': { folders: [], files: [], folderContents: {} },
+  'company-xyz': populatedWorkspaceContent(),
+}
+
+const readWorkspaceContent = (): Record<string, WorkspaceContent> => {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem('beam-workspace-content-v1') ?? '{}') as Record<string, WorkspaceContent>
+    return { ...initialWorkspaceContent, ...saved }
+  } catch { return initialWorkspaceContent }
+}
+
+const readWorkspaceBehavior = (workspaceId: string) => {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(`beam-settings-v3-${workspaceId}`) ?? '{}') as { defaultView?: string; confirmDelete?: boolean; trashRetention?: string }
+    return { defaultView: saved.defaultView === 'Grid' ? 'grid' as const : 'list' as const, confirmDelete: saved.confirmDelete ?? true, trashRetention: saved.trashRetention ?? '30 days' }
+  } catch { return { defaultView: 'list' as const, confirmDelete: true, trashRetention: '30 days' } }
+}
+
+type WorkspaceRole = 'Owner' | 'Admin' | 'Editor' | 'Viewer'
+type Workspace = { id: string; name: string; icon: string; role: WorkspaceRole }
+
+const initialWorkspaces: Workspace[] = [
+  { id: 'personal', name: 'Personal', icon: icons.avatar, role: 'Owner' },
+  { id: 'company-abc', name: 'Company ABC', icon: icons.companyAbc, role: 'Owner' },
+  { id: 'company-xyz', name: 'Company XYZ', icon: icons.companyXyz, role: 'Viewer' },
+]
+
+const readWorkspaces = () => [...initialWorkspaces, ...(() => { try { return JSON.parse(window.localStorage.getItem('beam-created-workspaces-v1') ?? '[]') as Workspace[] } catch { return [] } })()].map((workspace) => {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(`beam-settings-v3-${workspace.id}`) ?? '{}') as { workspaceName?: string }
+    return saved.workspaceName ? { ...workspace, name: saved.workspaceName } : workspace
+  } catch { return workspace }
+})
 
 function Icon({ src }: { src: string }) {
   return <img className="icon" src={src} alt="" aria-hidden="true" />
 }
 
 type SidebarProps = {
-  workspaceName: string
+  workspaces: Workspace[]
+  activeWorkspace: Workspace
+  onWorkspaceChange: (workspaceId: string) => void
+  onCreateWorkspace: () => void
+  canEditWorkspace: boolean
   accountName: string
   folders: Folder[]
   activeFolderName: string
@@ -136,7 +179,7 @@ type SidebarProps = {
   onOpenBilling: () => void
 }
 
-function Sidebar({ workspaceName, accountName, folders: sidebarFolders, activeFolderName, isCollapsed, isSearching, searchQuery, onToggle, onStartSearch, onSearchChange, onOpenFolder, onCreateFolder, isApiKeysActive, onOpenApiKeys, isSettingsActive, isFolderNavigationActive, onOpenSettings, onOpenAccount, onOpenBilling }: SidebarProps) {
+function Sidebar({ workspaces, activeWorkspace, onWorkspaceChange, onCreateWorkspace, canEditWorkspace, accountName, folders: sidebarFolders, activeFolderName, isCollapsed, isSearching, searchQuery, onToggle, onStartSearch, onSearchChange, onOpenFolder, onCreateFolder, isApiKeysActive, onOpenApiKeys, isSettingsActive, isFolderNavigationActive, onOpenSettings, onOpenAccount, onOpenBilling }: SidebarProps) {
   const [isOrgMenuOpen, setIsOrgMenuOpen] = useState(false)
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
   const [isAppearanceMenuOpen, setIsAppearanceMenuOpen] = useState(false)
@@ -147,8 +190,6 @@ function Sidebar({ workspaceName, accountName, folders: sidebarFolders, activeFo
   const [folderCreateSuccess, setFolderCreateSuccess] = useState('')
   const newFolderInputRef = useRef<HTMLInputElement>(null)
   const folderSuccessTimer = useRef<number | null>(null)
-  const [activeOrganization, setActiveOrganization] = useState('Personal')
-  const selectedOrganization = organizations.find((organization) => organization.name === activeOrganization) ?? organizations[0]
 
   useEffect(() => {
     if (isNewFolderOpen) newFolderInputRef.current?.focus()
@@ -229,35 +270,33 @@ function Sidebar({ workspaceName, accountName, folders: sidebarFolders, activeFo
           <div className="workspaceRow">
             <div className="organizationControl" data-org-menu>
               <button className="workspaceName" onClick={() => setIsOrgMenuOpen((open) => !open)} aria-haspopup="menu" aria-expanded={isOrgMenuOpen}>
-                {selectedOrganization.personal ? <Icon src={icons.personal} /> : <span className="organizationAvatar"><Icon src={selectedOrganization.icon} /></span>}
-                <span>{selectedOrganization.personal ? workspaceName : selectedOrganization.name}</span>
+                {activeWorkspace.id === 'personal' ? <Icon src={icons.personal} /> : <span className="organizationAvatar"><Icon src={activeWorkspace.icon} /></span>}
+                <span>{activeWorkspace.name}</span>
                 <span className={`organizationChevron${isOrgMenuOpen ? ' open' : ''}`}><Icon src={icons.chevron} /></span>
               </button>
               {isOrgMenuOpen && (
                 <div className="organizationMenu" role="menu" aria-label="Organizations">
                   <div className="organizationGroup">
-                    {organizations.map((organization) => {
-                      const isActive = organization.name === activeOrganization
+                    {workspaces.map((workspace) => {
+                      const isActive = workspace.id === activeWorkspace.id
                       return (
                         <button
                           className={`organizationOption${isActive ? ' active' : ''}`}
                           type="button"
                           role="menuitemradio"
                           aria-checked={isActive}
-                          key={organization.name}
-                          onClick={() => { setActiveOrganization(organization.name); setIsOrgMenuOpen(false) }}
+                          key={workspace.id}
+                          onClick={() => { onWorkspaceChange(workspace.id); setIsOrgMenuOpen(false) }}
                         >
-                          {organization.personal ? <img className="avatar" src="/assets/personal-menu-avatar.png" alt="" /> : <span className="organizationAvatar"><Icon src={organization.icon} /></span>}
-                          <span>{organization.personal ? workspaceName : organization.name}</span>
-                          {isActive && <Icon src={icons.orgCheck} />}
+                          {workspace.id === 'personal' ? <img className="avatar" src="/assets/workspace-menu-personal.png" alt="" /> : <span className="organizationAvatar"><img className="icon" src={workspace.id === 'company-xyz' ? '/assets/workspace-menu-xyz.svg' : '/assets/workspace-menu-abc.svg'} alt="" aria-hidden="true" /></span>}
+                          <span>{workspace.name}</span>
+                          {isActive && <img className="icon" src="/assets/workspace-menu-check.svg" alt="" aria-hidden="true" />}
                         </button>
                       )
                     })}
                   </div>
                   <div className="accountGroup">
-                    <div className="organizationLabel">Account</div>
-                    <button type="button" onClick={() => setIsOrgMenuOpen(false)}>Create workspace</button>
-                    <button type="button" onClick={() => setIsOrgMenuOpen(false)}>Add an account ...</button>
+                    <button className="workspaceAddAction" type="button" onClick={() => { setIsOrgMenuOpen(false); onCreateWorkspace() }}><img src="/assets/workspace-menu-add.svg" alt="" aria-hidden="true" />Add new workspace</button>
                   </div>
                 </div>
               )}
@@ -284,7 +323,7 @@ function Sidebar({ workspaceName, accountName, folders: sidebarFolders, activeFo
                 <button type="button" className="clearSearch" aria-label="Clear search" onClick={() => onSearchChange('')}><Icon src={icons.searchClear} /></button>
               ) : <Icon src={icons.shortcut} />}
             </label>
-          <button className="plainButton" aria-label="New folder" title={isCollapsed ? 'New folder' : undefined} disabled={isNewFolderOpen} onClick={() => { if (isCollapsed) onStartSearch(); setIsNewFolderOpen(true) }}>
+          <button className="plainButton" aria-label={canEditWorkspace ? 'New folder' : 'New folder unavailable with Viewer access'} title={isCollapsed ? 'New folder' : undefined} disabled={isNewFolderOpen || !canEditWorkspace} onClick={() => { if (isCollapsed) onStartSearch(); setIsNewFolderOpen(true) }}>
             <Icon src={icons.folder} /><span className="sidebarLabel">New folder</span>
           </button>
         </div>
@@ -351,8 +390,9 @@ function Sidebar({ workspaceName, accountName, folders: sidebarFolders, activeFo
   )
 }
 
-function NewFolderModal({ onCreate, onClose }: { onCreate: (name: string) => void; onClose: () => void }) {
+function NewFolderModal({ existingNames, onCreate, onClose }: { existingNames: string[]; onCreate: (name: string) => void; onClose: () => void }) {
   const [name, setName] = useState('')
+  const [error, setError] = useState('')
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -365,6 +405,7 @@ function NewFolderModal({ onCreate, onClose }: { onCreate: (name: string) => voi
   const submitFolder = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const trimmedName = name.trim()
+    if (existingNames.some((existing) => existing.toLocaleLowerCase() === trimmedName.toLocaleLowerCase())) { setError('A folder with this name already exists.'); return }
     if (trimmedName) onCreate(trimmedName)
   }
 
@@ -378,17 +419,19 @@ function NewFolderModal({ onCreate, onClose }: { onCreate: (name: string) => voi
             <button className="addFolderButton" type="submit" disabled={!name.trim()}><Icon src={icons.folder} />Add folder</button>
           </div>
           <div className="folderNameField">
-            <input id="new-folder-name" autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Untitled folder" />
+            <input id="new-folder-name" autoFocus aria-invalid={Boolean(error)} value={name} onChange={(event) => { setName(event.target.value); setError('') }} placeholder="Untitled folder" />
             <span aria-hidden="true">Press Enter ↵</span>
           </div>
+          {error && <p className="folderNameError" role="alert">{error}</p>}
         </form>
       </section>
     </div>
   )
 }
 
-function RenameFolderModal({ currentName, onRename, onClose }: { currentName: string; onRename: (name: string) => void; onClose: () => void }) {
+function RenameFolderModal({ currentName, existingNames, onRename, onClose }: { currentName: string; existingNames: string[]; onRename: (name: string) => void; onClose: () => void }) {
   const [name, setName] = useState(currentName)
+  const [error, setError] = useState('')
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
     document.addEventListener('keydown', closeOnEscape)
@@ -398,30 +441,31 @@ function RenameFolderModal({ currentName, onRename, onClose }: { currentName: st
     <div className="newFolderBackdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <section className="newFolderModal folderActionModal" role="dialog" aria-modal="true" aria-labelledby="rename-folder-title">
         <header><h2 id="rename-folder-title">Rename folder</h2><button type="button" aria-label="Close rename folder dialog" onClick={onClose}><Icon src={icons.fileActivityClose} /></button></header>
-        <form onSubmit={(event) => { event.preventDefault(); if (name.trim()) onRename(name.trim()) }}>
+        <form onSubmit={(event) => { event.preventDefault(); const nextName = name.trim(); if (existingNames.some((existing) => existing !== currentName && existing.toLocaleLowerCase() === nextName.toLocaleLowerCase())) { setError('A folder with this name already exists.'); return }; if (nextName) onRename(nextName) }}>
           <div className="folderLabelRow">
             <label htmlFor="rename-folder-name">Folder name</label>
             <button className="addFolderButton renameFolderButton" type="submit" disabled={!name.trim() || name.trim() === currentName}><Icon src={icons.actionRename} />Rename</button>
           </div>
           <div className="folderNameField">
-            <input id="rename-folder-name" autoFocus value={name} onChange={(event) => setName(event.target.value)} />
+            <input id="rename-folder-name" autoFocus aria-invalid={Boolean(error)} value={name} onChange={(event) => { setName(event.target.value); setError('') }} />
             <span aria-hidden="true">Press Enter ↵</span>
           </div>
+          {error && <p className="folderNameError" role="alert">{error}</p>}
         </form>
       </section>
     </div>
   )
 }
 
-function DeleteItemModal({ itemName, itemType, onConfirm, onClose }: { itemName: string; itemType: 'file' | 'folder'; onConfirm: () => void; onClose: () => void }) {
+function DeleteItemModal({ itemName, itemType, retention = '30 days', onConfirm, onClose }: { itemName: string; itemType: 'file' | 'folder'; retention?: string; onConfirm: () => void; onClose: () => void }) {
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
     document.addEventListener('keydown', closeOnEscape)
     return () => document.removeEventListener('keydown', closeOnEscape)
   }, [onClose])
   const message = itemType === 'folder'
-    ? `‘${itemName}’ and all files inside it will be moved to Trash. Shared links to these files will stop working immediately. You can restore the folder from Trash for 30 days before it is permanently deleted.`
-    : `‘${itemName}’ will be moved to Trash. Its shared link will stop working immediately. You can restore the file from Trash for 30 days before it is permanently deleted.`
+    ? `‘${itemName}’ and all files inside it will be moved to Trash. Shared links to these files will stop working immediately. You can restore the folder from Trash for ${retention} before it is permanently deleted.`
+    : `‘${itemName}’ will be moved to Trash. Its shared link will stop working immediately. You can restore the file from Trash for ${retention} before it is permanently deleted.`
   return (
     <div className="newFolderBackdrop deleteItemBackdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <section className="deleteItemModal" role="alertdialog" aria-modal="true" aria-labelledby="delete-item-title">
@@ -510,7 +554,7 @@ function formatDisplayFileSize(size: string) {
   return size.replace(/\s*(B|KB|MB|GB)$/i, ' $1')
 }
 
-function FolderDetail({ folderName, initialItems, onItemsChange, onBack }: { folderName: string; initialItems: FolderFile[]; onItemsChange: (items: FolderFile[]) => void; onBack: () => void }) {
+function FolderDetail({ folderName, initialItems, onItemsChange, onBack, readOnly = false, defaultView = 'list', confirmDelete = true, trashRetention = '30 days' }: { folderName: string; initialItems: FolderFile[]; onItemsChange: (items: FolderFile[]) => void; onBack: () => void; readOnly?: boolean; defaultView?: 'list' | 'grid'; confirmDelete?: boolean; trashRetention?: string }) {
   const [folderItems, setFolderItems] = useState<FolderFile[]>(initialItems)
   const [selectedFile, setSelectedFile] = useState<FolderFile | null>(null)
   const [infoFile, setInfoFile] = useState<FolderFile | null>(null)
@@ -519,9 +563,16 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack }: { fol
   const [openFileMenu, setOpenFileMenu] = useState<number | null>(null)
   const [fileToDelete, setFileToDelete] = useState<{ file: FolderFile; index: number } | null>(null)
   const [isDraggingFiles, setIsDraggingFiles] = useState(false)
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(defaultView)
   const [splitPercent, setSplitPercent] = useState(50)
   const [isResizing, setIsResizing] = useState(false)
+
+  useEffect(() => setViewMode(defaultView), [defaultView])
+
+  const removeFile = (file: FolderFile, index: number) => {
+    setFolderItems((items) => { const next = items.filter((_, itemIndex) => itemIndex !== index); onItemsChange(next); return next })
+    if (selectedFile === file) setSelectedFile(null)
+  }
   const previewLayoutRef = useRef<HTMLDivElement>(null)
   const isResizingRef = useRef(false)
   const dragDepthRef = useRef(0)
@@ -558,6 +609,7 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack }: { fol
   }, [openFileMenu])
 
   const addFiles = (incomingFiles: FileList | File[]) => {
+    if (readOnly) return
     const addedFiles = Array.from(incomingFiles).map((file) => ({
       name: file.name,
       kind: file.name.includes('.') ? file.name.split('.').pop()!.toLowerCase() : 'file',
@@ -604,6 +656,7 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack }: { fol
   }
 
   useEffect(() => {
+    if (readOnly) return
     const containsFiles = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes('Files')
     const handleDragEnter = (event: DragEvent) => {
       if (!containsFiles(event)) return
@@ -638,7 +691,7 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack }: { fol
       window.removeEventListener('dragleave', handleDragLeave)
       window.removeEventListener('drop', handleDrop)
     }
-  }, [])
+  }, [readOnly])
 
   const updateSplitFromPointer = (clientX: number) => {
     const bounds = previewLayoutRef.current?.getBoundingClientRect()
@@ -682,10 +735,10 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack }: { fol
       <nav className="breadcrumb" aria-label="Breadcrumb">
         <button onClick={onBack}>My Beam</button><span>/</span><span>{folderName}</span>
       </nav>
-      <div className="uploadActions">
+      {!readOnly && <div className="uploadActions">
         <label className="uploadButton"><Icon src={icons.upload} /><span>Upload file</span><input type="file" multiple onChange={(event) => { if (event.target.files) addFiles(event.target.files); event.target.value = '' }} /></label>
         <span>or drag and drop</span>
-      </div>
+      </div>}
     </div>
   )
 
@@ -716,7 +769,7 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack }: { fol
                 <button className="darkIcon" type="button" role="menuitem" onClick={() => { setInfoFile(file); setOpenFileMenu(null) }}><Icon src={icons.previewInfo} />Info</button>
                 <button className="darkIcon" type="button" role="menuitem" onClick={() => { void copyFileLink(file); setOpenFileMenu(null) }}><Icon src={icons.previewCopy} />Copy link</button>
                 <button className="darkIcon" type="button" role="menuitem" onClick={() => { downloadFile(file); setOpenFileMenu(null) }}><Icon src={icons.previewDownload} />Download</button>
-                <button type="button" role="menuitem" onClick={() => { setFileToDelete({ file, index }); setOpenFileMenu(null) }}><Icon src={icons.actionDelete} />Delete</button>
+                {!readOnly && <button type="button" role="menuitem" onClick={() => { if (confirmDelete) setFileToDelete({ file, index }); else removeFile(file, index); setOpenFileMenu(null) }}><Icon src={icons.actionDelete} />Delete</button>}
               </div>
             )}
           </div>
@@ -785,12 +838,13 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack }: { fol
         <>
           {detailHeader}
           <section className="detailEmptyState" aria-labelledby="detail-empty-title">
-            <img className="detailEmptyIllustration" src={icons.emptyFiles} alt="" aria-hidden="true" />
+            <img className="detailEmptyIllustration detailEmptyIllustrationLight" src={icons.emptyFiles} alt="" aria-hidden="true" />
+            <img className="detailEmptyIllustration detailEmptyIllustrationDark" src="/assets/empty-files-dark.svg" alt="" aria-hidden="true" />
             <div className="detailEmptyCopy">
               <h2 id="detail-empty-title">No files yet</h2>
               <p>This folder is empty. Upload a file to get started.</p>
             </div>
-            <label className="detailEmptyUpload"><Icon src={icons.upload} /><span>Upload file</span><input type="file" multiple onChange={(event) => { if (event.target.files) addFiles(event.target.files); event.target.value = '' }} /></label>
+            {!readOnly && <label className="detailEmptyUpload"><Icon src={icons.upload} /><span>Upload file</span><input type="file" multiple onChange={(event) => { if (event.target.files) addFiles(event.target.files); event.target.value = '' }} /></label>}
           </section>
         </>
       ) : <>{detailHeader}<div className="detailGrid"><div className="detailListPane">{viewMode === 'grid' ? detailGridView : detailTable}<div className="viewTabsDock">{viewTabs}</div></div><RecentActivity /></div></>}
@@ -806,7 +860,7 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack }: { fol
       {infoFile && <FileActivityModal file={infoFile} onClose={() => setInfoFile(null)} />}
       {copyFeedback && !selectedFile && <CopyTooltip feedback={copyFeedback} global />}
       {downloadFeedback && <DownloadToast feedback={downloadFeedback} onRetry={() => downloadFile(downloadFeedback.file)} onClose={() => setDownloadFeedback(null)} />}
-      {fileToDelete && <DeleteItemModal itemName={fileToDelete.file.name} itemType="file" onClose={() => setFileToDelete(null)} onConfirm={() => { const deleted = fileToDelete; setFolderItems((items) => { const next = items.filter((_, itemIndex) => itemIndex !== deleted.index); onItemsChange(next); return next }); if (selectedFile === deleted.file) setSelectedFile(null); setFileToDelete(null) }} />}
+      {fileToDelete && <DeleteItemModal itemName={fileToDelete.file.name} itemType="file" retention={trashRetention} onClose={() => setFileToDelete(null)} onConfirm={() => { removeFile(fileToDelete.file, fileToDelete.index); setFileToDelete(null) }} />}
     </div>
   )
 }
@@ -1126,13 +1180,14 @@ function Stats({ folderCount, fileCount, storageUsed }: { folderCount: number; f
 }
 
 export default function App() {
-  const [workspaceName, setWorkspaceName] = useState(() => {
-    try { return JSON.parse(window.localStorage.getItem('beam-settings-v2') ?? '{}').workspaceName || 'Personal' }
-    catch { return 'Personal' }
-  })
-  const [folderRows, setFolderRows] = useState<Folder[]>(folders)
-  const [homeFiles, setHomeFiles] = useState<FileRow[]>(files)
-  const [folderContents, setFolderContents] = useState<Record<string, FolderFile[]>>(initialFolderContents)
+  const [workspaces, setWorkspaces] = useState<Workspace[]>(readWorkspaces)
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState(() => window.localStorage.getItem('beam-active-workspace') || 'personal')
+  const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? workspaces[0]
+  const [workspaceContent, setWorkspaceContent] = useState<Record<string, WorkspaceContent>>(readWorkspaceContent)
+  const activeContent = workspaceContent[activeWorkspace.id] ?? { folders: [], files: [], folderContents: {} }
+  const folderRows = activeContent.folders
+  const homeFiles = activeContent.files
+  const folderContents = activeContent.folderContents
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -1148,10 +1203,14 @@ export default function App() {
   const [settingsDirty, setSettingsDirty] = useState(false)
   const [settingsLeaveRequest, setSettingsLeaveRequest] = useState(0)
   const [pendingView, setPendingView] = useState<AppView | null>(null)
+  const [pendingWorkspaceId, setPendingWorkspaceId] = useState<string | null>(null)
   const [settingsSaveToast, setSettingsSaveToast] = useState('')
-  const [accountName, setAccountName] = useState('Michele J.')
+  const [accountName, setAccountName] = useState(readAccountName)
   const [accountSaveToast, setAccountSaveToast] = useState('')
+  const [workspaceCreateToast, setWorkspaceCreateToast] = useState('')
+  const [isCreateWorkspaceOpen, setIsCreateWorkspaceOpen] = useState(false)
   const settingsSaveToastTimer = useRef<number | null>(null)
+  const workspaceBehavior = readWorkspaceBehavior(activeWorkspace.id)
 
   const normalizedQuery = searchQuery.trim().toLowerCase()
   const searchResults = homeFiles.filter((file) =>
@@ -1170,6 +1229,10 @@ export default function App() {
     window.addEventListener('popstate', restoreViewFromUrl)
     return () => window.removeEventListener('popstate', restoreViewFromUrl)
   }, [])
+
+  useEffect(() => {
+    window.localStorage.setItem('beam-workspace-content-v1', JSON.stringify(workspaceContent))
+  }, [workspaceContent])
 
   const commitView = (view: AppView) => {
     setCurrentView(view)
@@ -1211,9 +1274,12 @@ export default function App() {
   }
 
   const createFolder = (name: string) => {
-    setFolderRows((current) => [...current, { name, count: 0 }])
-    setHomeFiles((current) => [...current, { name, size: '0B', modified: 'Just now', kind: 'folder' }])
-    setFolderContents((current) => ({ ...current, [name]: [] }))
+    if (activeContent.folders.some((folder) => folder.name.toLocaleLowerCase() === name.toLocaleLowerCase())) return
+    setWorkspaceContent((current) => ({ ...current, [activeWorkspace.id]: {
+      folders: [...activeContent.folders, { name, count: 0 }],
+      files: [...activeContent.files, { name, size: '0B', modified: 'Just now', kind: 'folder' }],
+      folderContents: { ...activeContent.folderContents, [name]: [] },
+    } }))
     openView('home')
     setSearchQuery('')
     setIsSearching(false)
@@ -1221,26 +1287,31 @@ export default function App() {
 
   const renameFolder = (newName: string) => {
     if (!folderToRename) return
-    setFolderRows((current) => current.map((folder) => folder.name === folderToRename ? { ...folder, name: newName } : folder))
-    setHomeFiles((current) => current.map((file) => file.name === folderToRename ? { ...file, name: newName } : file))
-    setFolderContents((current) => {
-      const { [folderToRename]: renamedItems = [], ...remaining } = current
-      return { ...remaining, [newName]: renamedItems }
-    })
+    if (activeContent.folders.some((folder) => folder.name !== folderToRename && folder.name.toLocaleLowerCase() === newName.toLocaleLowerCase())) return
+    const { [folderToRename]: renamedItems = [], ...remainingContents } = activeContent.folderContents
+    setWorkspaceContent((current) => ({ ...current, [activeWorkspace.id]: {
+      folders: activeContent.folders.map((folder) => folder.name === folderToRename ? { ...folder, name: newName } : folder),
+      files: activeContent.files.map((file) => file.name === folderToRename ? { ...file, name: newName } : file),
+      folderContents: { ...remainingContents, [newName]: renamedItems },
+    } }))
     if (selectedFolderName === folderToRename) setSelectedFolderName(newName)
     setFolderToRename(null)
   }
 
-  const deleteFolder = () => {
-    if (!folderToDelete) return
-    setFolderRows((current) => current.filter((folder) => folder.name !== folderToDelete))
-    setHomeFiles((current) => current.filter((file) => file.name !== folderToDelete))
-    setFolderContents((current) => {
-      const { [folderToDelete]: _deletedItems, ...remaining } = current
-      return remaining
-    })
-    if (selectedFolderName === folderToDelete) openView('home')
+  const removeFolder = (folderName: string) => {
+    const { [folderName]: _deletedItems, ...remainingContents } = activeContent.folderContents
+    setWorkspaceContent((current) => ({ ...current, [activeWorkspace.id]: {
+      folders: activeContent.folders.filter((folder) => folder.name !== folderName),
+      files: activeContent.files.filter((file) => file.name !== folderName),
+      folderContents: remainingContents,
+    } }))
+    if (selectedFolderName === folderName) openView('home')
     setFolderToDelete(null)
+  }
+
+  const requestFolderDelete = (folderName: string) => {
+    if (workspaceBehavior.confirmDelete) setFolderToDelete(folderName)
+    else removeFolder(folderName)
   }
 
   const showSettingsSaveToast = (changeCount: number) => {
@@ -1249,10 +1320,75 @@ export default function App() {
     settingsSaveToastTimer.current = window.setTimeout(() => setSettingsSaveToast(''), 3000)
   }
 
+  const commitWorkspaceChange = (workspaceId: string) => {
+    setActiveWorkspaceId(workspaceId)
+    window.localStorage.setItem('beam-active-workspace', workspaceId)
+    setSettingsDirty(false)
+    setSearchQuery('')
+    setIsSearching(false)
+    setSelectedFolderName('Folder 001')
+  }
+
+  const changeWorkspace = (workspaceId: string) => {
+    if (workspaceId === activeWorkspace.id) return
+    if (currentView === 'settings' && settingsDirty) {
+      setPendingWorkspaceId(workspaceId)
+      setSettingsLeaveRequest((request) => request + 1)
+      return
+    }
+    commitWorkspaceChange(workspaceId)
+  }
+
+  const renameWorkspace = (workspaceId: string, name: string) => {
+    setWorkspaces((current) => current.map((workspace) => workspace.id === workspaceId ? { ...workspace, name } : workspace))
+  }
+
+  const saveAccountName = (name: string) => {
+    window.localStorage.setItem('beam-account-display-name', name)
+    for (const workspace of workspaces) {
+      try {
+        const key = `beam-members-v1-${workspace.id}`
+        const stored = window.localStorage.getItem(key)
+        if (!stored) continue
+        const members = JSON.parse(stored) as Array<{ id: string; name: string; email: string; role: WorkspaceRole; status: string }>
+        window.localStorage.setItem(key, JSON.stringify(members.map((member) => member.email.toLocaleLowerCase() === accountEmail ? { ...member, name } : member)))
+      } catch { /* Keep the account save available if prototype member data is invalid. */ }
+    }
+    setAccountName(name)
+    setAccountSaveToast(`${name} is now your display name.`)
+    window.setTimeout(() => setAccountSaveToast(''), 3000)
+  }
+
+  const createWorkspace = ({ name, invitations }: { name: string; invitations: Array<{ email: string; role: 'Admin' | 'Editor' | 'Viewer' }> }) => {
+    const baseId = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'workspace'
+    let workspaceId = baseId
+    let suffix = 2
+    while (workspaces.some((workspace) => workspace.id === workspaceId)) { workspaceId = `${baseId}-${suffix}`; suffix += 1 }
+    const workspace: Workspace = { id: workspaceId, name, icon: icons.companyAbc, role: 'Owner' }
+    const nextWorkspaces = [...workspaces, workspace]
+    setWorkspaces(nextWorkspaces)
+    window.localStorage.setItem('beam-created-workspaces-v1', JSON.stringify(nextWorkspaces.filter((candidate) => !initialWorkspaces.some((initial) => initial.id === candidate.id))))
+    window.localStorage.setItem(`beam-api-keys-v1-${workspaceId}`, '[]')
+    window.localStorage.setItem(`beam-members-v1-${workspaceId}`, JSON.stringify([
+      { id: 'michele', name: accountName, email: accountEmail, role: 'Owner', status: 'Active' },
+      ...invitations.map((invitation, index) => ({ id: `invite-${Date.now()}-${index}`, name: invitation.email.split('@')[0], email: invitation.email, role: invitation.role, status: 'Pending' })),
+    ]))
+    setWorkspaceContent((current) => ({ ...current, [workspaceId]: { folders: [], files: [], folderContents: {} } }))
+    setIsCreateWorkspaceOpen(false)
+    commitWorkspaceChange(workspaceId)
+    commitView('home')
+    setWorkspaceCreateToast(`${name} is ready to use.`)
+    window.setTimeout(() => setWorkspaceCreateToast(''), 3000)
+  }
+
   return (
     <main className={`appShell${isSidebarCollapsed ? ' sidebarCollapsed' : ''}`}>
       <Sidebar
-        workspaceName={workspaceName}
+        workspaces={workspaces}
+        activeWorkspace={activeWorkspace}
+        onWorkspaceChange={changeWorkspace}
+        onCreateWorkspace={() => setIsCreateWorkspaceOpen(true)}
+        canEditWorkspace={activeWorkspace.role !== 'Viewer'}
         accountName={accountName}
         folders={folderRows}
         activeFolderName={selectedFolderName}
@@ -1273,14 +1409,17 @@ export default function App() {
         onOpenBilling={() => { openView('billing'); setSearchQuery(''); setIsSearching(false) }}
       />
       <section className="content">
-        {currentView === 'billing' && !isSearching ? <BillingUsagePage /> : currentView === 'account' && !isSearching ? <AccountProfilePage displayName={accountName} onDisplayNameSave={(name) => { setAccountName(name); setAccountSaveToast(`${name} is now your display name.`); window.setTimeout(() => setAccountSaveToast(''), 3000) }} /> : currentView === 'settings' && !isSearching ? <SettingsPage onOpenApiKeys={() => openView('apiKeys')} onWorkspaceNameChange={setWorkspaceName} onDirtyChange={setSettingsDirty} onSaveSuccess={showSettingsSaveToast} leaveRequest={settingsLeaveRequest} onLeaveResolved={(proceed) => {
-          if (!proceed) { setPendingView(null); return }
+        {currentView === 'billing' && !isSearching ? <BillingUsagePage key={activeWorkspace.id} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.name} storageUsedMb={Math.round(totalStorageBytes / (1024 * 1024))} /> : currentView === 'account' && !isSearching ? <AccountProfilePage displayName={accountName} onDisplayNameSave={saveAccountName} /> : currentView === 'settings' && !isSearching ? <SettingsPage key={activeWorkspace.id} workspace={activeWorkspace} storageUsedMb={Math.round(totalStorageBytes / (1024 * 1024))} onOpenApiKeys={() => openView('apiKeys')} onWorkspaceNameChange={renameWorkspace} onDirtyChange={setSettingsDirty} onSaveSuccess={showSettingsSaveToast} leaveRequest={settingsLeaveRequest} onLeaveResolved={(proceed) => {
+          if (!proceed) { setPendingView(null); setPendingWorkspaceId(null); return }
           setSettingsDirty(false)
+          if (pendingWorkspaceId) { const nextWorkspaceId = pendingWorkspaceId; setPendingWorkspaceId(null); commitWorkspaceChange(nextWorkspaceId) }
           if (pendingView) { const nextView = pendingView; setPendingView(null); commitView(nextView) }
-        }} /> : currentView === 'apiKeys' && !isSearching ? <ApiKeysPage /> : currentView === 'folder' && !isSearching ? <FolderDetail key={selectedFolderName} folderName={selectedFolderName} initialItems={folderContents[selectedFolderName] ?? []} onItemsChange={(items) => {
-          setFolderContents((current) => ({ ...current, [selectedFolderName]: items }))
-          setFolderRows((current) => current.map((folder) => folder.name === selectedFolderName ? { ...folder, count: items.length } : folder))
-          setHomeFiles((current) => current.map((file) => file.name === selectedFolderName ? { ...file, size: formatFileSize(items.reduce((total, item) => total + fileSizeInBytes(item.size), 0)), modified: 'Just now' } : file))
+        }} /> : currentView === 'apiKeys' && !isSearching ? <ApiKeysPage key={activeWorkspace.id} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.name} readOnly={activeWorkspace.role === 'Viewer'} /> : currentView === 'folder' && !isSearching ? <FolderDetail key={`${activeWorkspace.id}-${selectedFolderName}`} folderName={selectedFolderName} initialItems={folderContents[selectedFolderName] ?? []} readOnly={activeWorkspace.role === 'Viewer'} defaultView={workspaceBehavior.defaultView} confirmDelete={workspaceBehavior.confirmDelete} trashRetention={workspaceBehavior.trashRetention} onItemsChange={(items) => {
+          setWorkspaceContent((current) => ({ ...current, [activeWorkspace.id]: {
+            folders: activeContent.folders.map((folder) => folder.name === selectedFolderName ? { ...folder, count: items.length } : folder),
+            files: activeContent.files.map((file) => file.name === selectedFolderName ? { ...file, size: formatFileSize(items.reduce((total, item) => total + fileSizeInBytes(item.size), 0)), modified: 'Just now' } : file),
+            folderContents: { ...activeContent.folderContents, [selectedFolderName]: items },
+          } }))
         }} onBack={() => setCurrentView('home')} /> : isSearching ? (
           <>
             <div className="searchFilters" aria-label="Search filters">
@@ -1290,31 +1429,34 @@ export default function App() {
                 </button>
               ))}
             </div>
-            <div className="contentGrid searchGrid"><FileTable rows={searchResults} showHeader={false} onOpenFolder={openFolder} onRenameFolder={setFolderToRename} onDeleteFolder={setFolderToDelete} /><Stats folderCount={folderRows.length} fileCount={totalFileCount} storageUsed={storageSummary} /></div>
+            <div className="contentGrid searchGrid"><FileTable rows={searchResults} showHeader={false} onOpenFolder={openFolder} onRenameFolder={activeWorkspace.role === 'Viewer' ? undefined : setFolderToRename} onDeleteFolder={activeWorkspace.role === 'Viewer' ? undefined : requestFolderDelete} /><Stats folderCount={folderRows.length} fileCount={totalFileCount} storageUsed={storageSummary} /></div>
           </>
         ) : (
           <>
             <h1>My Beam</h1>
             {folderRows.length === 0 ? (
               <section className="emptyBeamState" aria-labelledby="empty-beam-title">
-                <img className="emptyBeamIllustration" src={icons.emptyFolders} alt="" aria-hidden="true" />
+                <img className="emptyBeamIllustration emptyBeamIllustrationLight" src={icons.emptyFolders} alt="" aria-hidden="true" />
+                <img className="emptyBeamIllustration emptyBeamIllustrationDark" src="/assets/empty-folder-dark.svg" alt="" aria-hidden="true" />
                 <div className="emptyBeamCopy">
                   <h2 id="empty-beam-title">No folder yet</h2>
                   <p>Create a folder to get started.</p>
                 </div>
-                <button className="emptyBeamCreate" type="button" onClick={() => setIsEmptyCreateOpen(true)}><Icon src={icons.folder} />Create Folder</button>
+                {activeWorkspace.role !== 'Viewer' && <button className="emptyBeamCreate" type="button" onClick={() => setIsEmptyCreateOpen(true)}><Icon src={icons.folder} />Create Folder</button>}
               </section>
             ) : (
-              <div className="contentGrid"><FileTable rows={homeFiles} onOpenFolder={openFolder} onRenameFolder={setFolderToRename} onDeleteFolder={setFolderToDelete} /><Stats folderCount={folderRows.length} fileCount={totalFileCount} storageUsed={storageSummary} /></div>
+              <div className="contentGrid"><FileTable rows={homeFiles} onOpenFolder={openFolder} onRenameFolder={activeWorkspace.role === 'Viewer' ? undefined : setFolderToRename} onDeleteFolder={activeWorkspace.role === 'Viewer' ? undefined : requestFolderDelete} /><Stats folderCount={folderRows.length} fileCount={totalFileCount} storageUsed={storageSummary} /></div>
             )}
           </>
         )}
       </section>
+      {isCreateWorkspaceOpen && <div className="createWorkspaceOverlay"><CreateWorkspacePage existingNames={workspaces.map((workspace) => workspace.name)} onCancel={() => setIsCreateWorkspaceOpen(false)} onCreate={createWorkspace} /></div>}
       {settingsSaveToast && <div className="apiCreatedToast" role="status" aria-live="polite"><span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span><div><strong>Settings saved</strong><span>{settingsSaveToast}</span></div></div>}
       {accountSaveToast && <div className="apiCreatedToast" role="status" aria-live="polite"><span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span><div><strong>Account updated</strong><span>{accountSaveToast}</span></div></div>}
-      {folderToRename && <RenameFolderModal currentName={folderToRename} onRename={renameFolder} onClose={() => setFolderToRename(null)} />}
-      {folderToDelete && <DeleteItemModal itemName={folderToDelete} itemType="folder" onConfirm={deleteFolder} onClose={() => setFolderToDelete(null)} />}
-      {isEmptyCreateOpen && <NewFolderModal onCreate={(name) => { createFolder(name); setIsEmptyCreateOpen(false) }} onClose={() => setIsEmptyCreateOpen(false)} />}
+      {workspaceCreateToast && <div className="apiCreatedToast" role="status" aria-live="polite"><span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span><div><strong>Workspace created</strong><span>{workspaceCreateToast}</span></div></div>}
+      {folderToRename && <RenameFolderModal currentName={folderToRename} existingNames={folderRows.map((folder) => folder.name)} onRename={renameFolder} onClose={() => setFolderToRename(null)} />}
+      {folderToDelete && <DeleteItemModal itemName={folderToDelete} itemType="folder" retention={workspaceBehavior.trashRetention} onConfirm={() => removeFolder(folderToDelete)} onClose={() => setFolderToDelete(null)} />}
+      {isEmptyCreateOpen && <NewFolderModal existingNames={folderRows.map((folder) => folder.name)} onCreate={(name) => { createFolder(name); setIsEmptyCreateOpen(false) }} onClose={() => setIsEmptyCreateOpen(false)} />}
     </main>
   )
 }

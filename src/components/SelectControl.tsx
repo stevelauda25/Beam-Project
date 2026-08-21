@@ -4,6 +4,7 @@ type SelectControlProps = {
   value: string
   options: string[]
   icon?: string
+  chevronIcon?: string
   label: string
   onChange: (value: string) => void
   className?: string
@@ -11,7 +12,7 @@ type SelectControlProps = {
 
 const Icon = ({ src }: { src: string }) => <img className="settingsIcon" src={src} alt="" aria-hidden="true" />
 
-export default function SelectControl({ value, options, icon, label, onChange, className = '' }: SelectControlProps) {
+export default function SelectControl({ value, options, icon, chevronIcon = '/assets/settings-user.svg', label, onChange, className = '' }: SelectControlProps) {
   const [open, setOpen] = useState(false)
   const [focusedIndex, setFocusedIndex] = useState(() => Math.max(0, options.indexOf(value)))
   const rootRef = useRef<HTMLDivElement>(null)
@@ -51,7 +52,7 @@ export default function SelectControl({ value, options, icon, label, onChange, c
 
   return <div className={`settingsSelect${open ? ' open' : ''}${className ? ` ${className}` : ''}`} ref={rootRef}>
     <button ref={triggerRef} className="settingsSelectTrigger" type="button" aria-label={`${label}: ${value}`} aria-haspopup="listbox" aria-expanded={open} onClick={() => open ? setOpen(false) : openAt(Math.max(0, options.indexOf(value)))} onKeyDown={handleTriggerKeyDown}>
-      {icon && <Icon src={icon} />}<span>{value}</span><Icon src="/assets/settings-user.svg" />
+      {icon && <Icon src={icon} />}<span>{value}</span><Icon src={chevronIcon} />
     </button>
     {open && <div className="settingsSelectMenu" role="listbox" aria-label={label}>{options.map((option, index) => <button ref={(node) => { optionRefs.current[index] = node }} className={`${option === value ? 'selected ' : ''}${index === focusedIndex ? 'focused' : ''}`} type="button" role="option" aria-selected={option === value} tabIndex={index === focusedIndex ? 0 : -1} key={option} onMouseEnter={() => setFocusedIndex(index)} onKeyDown={(event) => handleOptionKeyDown(event, index)} onClick={() => choose(option)}><span>{option}</span>{option === value && <Icon src="/assets/settings-list.svg" />}</button>)}</div>}
   </div>

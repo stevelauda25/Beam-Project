@@ -73,6 +73,14 @@ const INITIAL_KEYS: ApiKey[] = [
   { id: 3, name: 'Claude Agent', access: 'Docs workspace', permission: 'Admin', createdAt: '2026-08-11T00:00:00.000Z', lastUsed: 'Yesterday', expiresAt: '2026-09-10T00:00:00.000Z', prefix: 'fmd_live_', lastFour: 'W2Bz' },
 ]
 
+const readWorkspaceKeys = (workspaceId: string) => {
+  try {
+    const stored = window.localStorage.getItem(`beam-api-keys-v1-${workspaceId}`)
+    if (stored) return JSON.parse(stored) as ApiKey[]
+  } catch { /* Use the workspace prototype defaults. */ }
+  return workspaceId === 'company-abc' ? [] : INITIAL_KEYS
+}
+
 function SelectField({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
   const [isOpen, setIsOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(Math.max(0, options.indexOf(value)))
@@ -171,8 +179,8 @@ function SelectField({ label, value, options, onChange }: { label: string; value
   )
 }
 
-export default function ApiKeysPage() {
-  const [keys, setKeys] = useState<ApiKey[]>(INITIAL_KEYS)
+export default function ApiKeysPage({ workspaceId, workspaceName, readOnly = false }: { workspaceId: string; workspaceName: string; readOnly?: boolean }) {
+  const [keys, setKeys] = useState<ApiKey[]>(() => readWorkspaceKeys(workspaceId))
   const [name, setName] = useState('')
   const [isNameTouched, setIsNameTouched] = useState(false)
   const [access, setAccess] = useState('')
@@ -203,6 +211,10 @@ export default function ApiKeysPage() {
     if (revokedToastTimerRef.current !== null) window.clearTimeout(revokedToastTimerRef.current)
     if (copiedKeyTimerRef.current !== null) window.clearTimeout(copiedKeyTimerRef.current)
   }, [])
+
+  useEffect(() => {
+    window.localStorage.setItem(`beam-api-keys-v1-${workspaceId}`, JSON.stringify(keys))
+  }, [keys, workspaceId])
 
   useEffect(() => {
     if (!keyToRevoke) return
@@ -290,7 +302,9 @@ export default function ApiKeysPage() {
   return (
     <section className="apiKeysPage" aria-labelledby="api-keys-title">
       <h1 id="api-keys-title">API Keys</h1>
-      <form className="apiKeyForm" onSubmit={createKey}>
+      <p className="apiWorkspaceContext">{workspaceName}{readOnly ? ' · Viewer' : ''}</p>
+      {readOnly && <div className="apiReadOnlyNotice" role="note">You can review API keys for this workspace, but only an owner or admin can create or revoke them.</div>}
+      {!readOnly && <form className="apiKeyForm" onSubmit={createKey}>
         <div className="apiKeyFields">
           <label className="apiNameField">
             <span className="srOnly">API key name</span>
@@ -304,7 +318,7 @@ export default function ApiKeysPage() {
           </button>
         </div>
         <div className="apiKeyHint" id="api-key-name-feedback"><span className={isNameTouched && nameError ? 'apiNameError' : ''} role={isNameTouched && nameError ? 'alert' : undefined}>{isNameTouched && nameError ? nameError : 'Create an API key for apps, scripts, or agents. The full key is shown only once.'}</span></div>
-      </form>
+      </form>}
 
       {createdKey && (
         <section className="apiCreationBanner" aria-labelledby="created-api-key-title" aria-describedby="created-api-key-warning" aria-live="polite">
@@ -320,7 +334,8 @@ export default function ApiKeysPage() {
       )}
       {keys.length === 0 ? (
         <section className="apiKeysEmptyState" aria-labelledby="api-keys-empty-title" aria-describedby="api-keys-empty-description">
-          <img src="/assets/api-keys-empty.svg" width="229" height="288" alt="" aria-hidden="true" />
+          <img className="apiKeysEmptyIllustration apiKeysEmptyIllustrationLight" src="/assets/api-keys-empty.svg" width="229" height="288" alt="" aria-hidden="true" />
+          <img className="apiKeysEmptyIllustration apiKeysEmptyIllustrationDark" src="/assets/api-keys-empty-dark.svg" width="229" height="288" alt="" aria-hidden="true" />
           <div>
             <h2 id="api-keys-empty-title">No API keys yet</h2>
             <p id="api-keys-empty-description">Create your first API key to connect apps, scripts, or agents to Beam.</p>
@@ -344,7 +359,7 @@ export default function ApiKeysPage() {
               <div role="cell">{key.expiresAt ? formatDate(key.expiresAt) : 'No expiry'}</div>
               <div role="cell"><span className={`apiStatusBadge ${status}`}>{statusLabel[status]}</span></div>
               <div role="cell" className="apiMenuCell">
-                <button type="button" disabled={!canRevoke} aria-label={canRevoke ? `Actions for ${key.name}` : `${key.name} is ${statusLabel[status].toLowerCase()}`} aria-expanded={openMenuId === key.id} onClick={() => setOpenMenuId((current) => current === key.id ? null : key.id)}><img src={apiIcons.more} alt="" /></button>
+                <button type="button" disabled={!canRevoke || readOnly} aria-label={readOnly ? `${key.name} is read only` : canRevoke ? `Actions for ${key.name}` : `${key.name} is ${statusLabel[status].toLowerCase()}`} aria-expanded={openMenuId === key.id} onClick={() => setOpenMenuId((current) => current === key.id ? null : key.id)}><img src={apiIcons.more} alt="" /></button>
                 {openMenuId === key.id && <div className="apiRowMenu"><button type="button" onClick={() => { setKeyToRevoke(key); setOpenMenuId(null) }}>Revoke key</button></div>}
               </div>
             </div>
