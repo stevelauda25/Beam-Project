@@ -93,7 +93,7 @@ function SelectField({ label, value, options, onChange }: { label: string; value
   useEffect(() => {
     if (!isOpen) return
     const closeOnOutsideClick = (event: MouseEvent) => {
-      if (!fieldRef.current?.contains(event.target as Node)) setIsOpen(false)
+      if (!fieldRef.current?.contains(event.target as Node)) { setIsOpen(false); window.requestAnimationFrame(() => triggerRef.current?.focus()) }
     }
     document.addEventListener('mousedown', closeOnOutsideClick)
     return () => document.removeEventListener('mousedown', closeOnOutsideClick)
@@ -201,6 +201,7 @@ export default function ApiKeysPage({ workspaceId, workspaceName, readOnly = fal
   const createdKeyTextRef = useRef<HTMLSpanElement>(null)
   const revokedToastTimerRef = useRef<number | null>(null)
   const copiedKeyTimerRef = useRef<number | null>(null)
+  const rowMenuTriggerRefs = useRef(new Map<number, HTMLButtonElement>())
   const normalizedName = normalizeKeyName(name)
   const nameError = validateKeyName(name, keys)
   const isFormValid = !createdKey && !nameError && Boolean(access && permission && expires)
@@ -215,6 +216,25 @@ export default function ApiKeysPage({ workspaceId, workspaceName, readOnly = fal
   useEffect(() => {
     window.localStorage.setItem(`beam-api-keys-v1-${workspaceId}`, JSON.stringify(keys))
   }, [keys, workspaceId])
+
+  useEffect(() => {
+    if (openMenuId === null) return
+    const closeMenu = (restoreFocus: boolean) => {
+      const trigger = rowMenuTriggerRefs.current.get(openMenuId)
+      setOpenMenuId(null)
+      if (restoreFocus) window.requestAnimationFrame(() => trigger?.focus())
+    }
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!(event.target as HTMLElement).closest('.apiMenuCell')) closeMenu(true)
+    }
+    const handleKeys = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); closeMenu(true) }
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); document.querySelector<HTMLButtonElement>('.apiRowMenu button')?.focus() }
+    }
+    document.addEventListener('mousedown', closeOnOutsideClick)
+    document.addEventListener('keydown', handleKeys)
+    return () => { document.removeEventListener('mousedown', closeOnOutsideClick); document.removeEventListener('keydown', handleKeys) }
+  }, [openMenuId])
 
   useEffect(() => {
     if (!keyToRevoke) return
@@ -308,7 +328,7 @@ export default function ApiKeysPage({ workspaceId, workspaceName, readOnly = fal
         <div className="apiKeyFields">
           <label className="apiNameField">
             <span className="srOnly">API key name</span>
-            <input value={name} spellCheck={false} autoCapitalize="none" onChange={(event) => setName(event.target.value)} onBlur={() => setIsNameTouched(true)} placeholder="Enter the name" aria-invalid={isNameTouched && Boolean(nameError)} aria-describedby="api-key-name-feedback" />
+            <input value={name} spellCheck={false} autoCapitalize="none" onChange={(event) => setName(event.target.value)} onBlur={() => setIsNameTouched(true)} placeholder="e.g. Production integration" aria-invalid={isNameTouched && Boolean(nameError)} aria-describedby="api-key-name-feedback" />
           </label>
           <SelectField label="Access" value={access} options={['All workspaces', 'Marketing ws', 'Docs workspace']} onChange={setAccess} />
           <SelectField label="Permission" value={permission} options={['Admin', 'Write']} onChange={setPermission} />
@@ -329,6 +349,7 @@ export default function ApiKeysPage({ workspaceId, workspaceName, readOnly = fal
               <button type="button" onClick={() => setIsCreatedKeyVisible((visible) => !visible)} aria-label={isCreatedKeyVisible ? 'Hide API key' : 'Show API key'} aria-pressed={isCreatedKeyVisible}><img className={isCreatedKeyVisible ? 'apiBannerHideIcon' : ''} src={isCreatedKeyVisible ? apiIcons.hide : apiIcons.bannerShow} alt="" /></button>
               <span className="apiCopyControl"><button type="button" onClick={() => void copyCreatedKey()} aria-label="Copy API key"><img src={apiIcons.bannerCopy} alt="" /></button>{createdCopyFeedback && <span className={`copyNotice${createdCopyFeedback === 'failure' ? ' failure' : ''}`} role={createdCopyFeedback === 'failure' ? 'alert' : 'status'}>{createdCopyFeedback === 'success' ? 'API key copied' : 'Copy failed — press ⌘C or Ctrl+C'}</span>}</span>
             </div>
+            <button className="apiCreationDone" type="button" onClick={() => { setCreatedKey(null); setCreatedCopyFeedback(null); window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.apiNameField input')?.focus()) }}>Done</button>
           </div>
         </section>
       )}
@@ -359,8 +380,8 @@ export default function ApiKeysPage({ workspaceId, workspaceName, readOnly = fal
               <div role="cell">{key.expiresAt ? formatDate(key.expiresAt) : 'No expiry'}</div>
               <div role="cell"><span className={`apiStatusBadge ${status}`}>{statusLabel[status]}</span></div>
               <div role="cell" className="apiMenuCell">
-                <button type="button" disabled={!canRevoke || readOnly} aria-label={readOnly ? `${key.name} is read only` : canRevoke ? `Actions for ${key.name}` : `${key.name} is ${statusLabel[status].toLowerCase()}`} aria-expanded={openMenuId === key.id} onClick={() => setOpenMenuId((current) => current === key.id ? null : key.id)}><img src={apiIcons.more} alt="" /></button>
-                {openMenuId === key.id && <div className="apiRowMenu"><button type="button" onClick={() => { setKeyToRevoke(key); setOpenMenuId(null) }}>Revoke key</button></div>}
+                <button ref={(node) => { if (node) rowMenuTriggerRefs.current.set(key.id, node); else rowMenuTriggerRefs.current.delete(key.id) }} type="button" disabled={!canRevoke || readOnly} aria-haspopup="menu" aria-label={readOnly ? `${key.name} is read only` : canRevoke ? `Actions for ${key.name}` : `${key.name} is ${statusLabel[status].toLowerCase()}`} aria-expanded={openMenuId === key.id} onClick={() => setOpenMenuId((current) => current === key.id ? null : key.id)} onKeyDown={(event) => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setOpenMenuId(key.id); window.requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.apiRowMenu button')?.focus()) } }}><img src={apiIcons.more} alt="" /></button>
+                {openMenuId === key.id && <div className="apiRowMenu" role="menu"><button type="button" role="menuitem" onClick={() => { setKeyToRevoke(key); setOpenMenuId(null) }}>Revoke key</button></div>}
               </div>
             </div>
             <div className="apiKeyValue" role="row">

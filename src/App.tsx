@@ -4,6 +4,7 @@ import SettingsPage from './components/SettingsPage'
 import AccountProfilePage from './components/AccountProfilePage'
 import BillingUsagePage from './components/BillingUsagePage'
 import CreateWorkspacePage from './components/CreateWorkspacePage'
+import UploadDemoOverlay from './components/UploadDemoOverlay'
 
 const icons = {
   personal: '/assets/personal.svg',
@@ -53,7 +54,7 @@ const icons = {
 
 type Folder = { name: string; count: number; active?: boolean }
 type FileKind = 'folder' | 'file'
-type FileRow = { name: string; size: string; modified: string; badge?: string; kind: FileKind }
+type FileRow = { name: string; size: string; modified: string; badge?: string; kind: FileKind; folderName?: string; path?: string }
 type AppView = 'home' | 'folder' | 'apiKeys' | 'settings' | 'account' | 'billing'
 type AppearanceTheme = 'light' | 'dark' | 'system'
 const accountEmail = 'michele@beam.app'
@@ -199,11 +200,23 @@ function Sidebar({ workspaces, activeWorkspace, onWorkspaceChange, onCreateWorks
   const [folderCreateError, setFolderCreateError] = useState('')
   const [folderCreateSuccess, setFolderCreateSuccess] = useState('')
   const newFolderInputRef = useRef<HTMLInputElement>(null)
+  const newFolderRowRef = useRef<HTMLDivElement>(null)
+  const accountMenuRef = useRef<HTMLDivElement>(null)
+  const accountTriggerRef = useRef<HTMLButtonElement>(null)
   const folderSuccessTimer = useRef<number | null>(null)
 
   useEffect(() => {
     if (isNewFolderOpen) newFolderInputRef.current?.focus()
   }, [isNewFolderOpen])
+
+  useEffect(() => {
+    if (!isNewFolderOpen) return
+    const closeEmptyEntry = (event: MouseEvent) => {
+      if (!newFolderName.trim() && !newFolderRowRef.current?.contains(event.target as Node)) closeFolderEntry()
+    }
+    document.addEventListener('mousedown', closeEmptyEntry)
+    return () => document.removeEventListener('mousedown', closeEmptyEntry)
+  }, [isNewFolderOpen, newFolderName])
 
   useEffect(() => () => { if (folderSuccessTimer.current !== null) window.clearTimeout(folderSuccessTimer.current) }, [])
 
@@ -238,10 +251,13 @@ function Sidebar({ workspaces, activeWorkspace, onWorkspaceChange, onCreateWorks
   useEffect(() => {
     if (!isAccountMenuOpen) return
     const closeMenu = (event: MouseEvent) => {
-      if (!(event.target as HTMLElement).closest('[data-account-menu]')) setIsAccountMenuOpen(false)
+      if (!(event.target as HTMLElement).closest('[data-account-menu]')) { setIsAccountMenuOpen(false); accountTriggerRef.current?.focus() }
     }
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsAccountMenuOpen(false)
+      if (event.key === 'Escape') {
+        if (isAppearanceMenuOpen) setIsAppearanceMenuOpen(false)
+        else { setIsAccountMenuOpen(false); accountTriggerRef.current?.focus() }
+      }
     }
     document.addEventListener('mousedown', closeMenu)
     document.addEventListener('keydown', closeOnEscape)
@@ -249,7 +265,17 @@ function Sidebar({ workspaces, activeWorkspace, onWorkspaceChange, onCreateWorks
       document.removeEventListener('mousedown', closeMenu)
       document.removeEventListener('keydown', closeOnEscape)
     }
-  }, [isAccountMenuOpen])
+  }, [isAccountMenuOpen, isAppearanceMenuOpen])
+
+  const handleAccountMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+    const items = Array.from(accountMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"], [role="menuitemradio"], .accountPlan') ?? []).filter((item) => !item.disabled)
+    if (!items.length) return
+    event.preventDefault()
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement)
+    const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : event.key === 'ArrowDown' ? (currentIndex + 1) % items.length : (currentIndex - 1 + items.length) % items.length
+    items[nextIndex].focus()
+  }
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)')
@@ -279,13 +305,12 @@ function Sidebar({ workspaces, activeWorkspace, onWorkspaceChange, onCreateWorks
       <div className="sidebarTop">
           <div className="workspaceRow">
             <div className="organizationControl" data-org-menu>
-              <button className="workspaceName" onClick={() => setIsOrgMenuOpen((open) => !open)} aria-haspopup="menu" aria-expanded={isOrgMenuOpen}>
+              <button className="workspaceName" onClick={() => { setIsAccountMenuOpen(false); setIsOrgMenuOpen((open) => !open) }} aria-haspopup="menu" aria-expanded={isOrgMenuOpen}>
                 {activeWorkspace.id === 'personal' ? <Icon src={icons.personal} /> : <span className="organizationAvatar"><Icon src={activeWorkspace.icon} /></span>}
                 <span>{activeWorkspace.name}</span>
                 <span className={`organizationChevron${isOrgMenuOpen ? ' open' : ''}`}><Icon src={icons.chevron} /></span>
               </button>
-              {isOrgMenuOpen && (
-                <div className="organizationMenu" role="menu" aria-label="Organizations">
+              <div className={`organizationMenu${isOrgMenuOpen ? ' open' : ''}`} role="menu" aria-label="Organizations" aria-hidden={!isOrgMenuOpen}>
                   <div className="organizationGroup">
                     {workspaces.map((workspace) => {
                       const isActive = workspace.id === activeWorkspace.id
@@ -295,6 +320,7 @@ function Sidebar({ workspaces, activeWorkspace, onWorkspaceChange, onCreateWorks
                           type="button"
                           role="menuitemradio"
                           aria-checked={isActive}
+                          tabIndex={isOrgMenuOpen ? 0 : -1}
                           key={workspace.id}
                           onClick={() => { onWorkspaceChange(workspace.id); setIsOrgMenuOpen(false) }}
                         >
@@ -306,10 +332,9 @@ function Sidebar({ workspaces, activeWorkspace, onWorkspaceChange, onCreateWorks
                     })}
                   </div>
                   <div className="accountGroup">
-                    <button className="workspaceAddAction" type="button" onClick={() => { setIsOrgMenuOpen(false); onCreateWorkspace() }}><img src="/assets/workspace-menu-add.svg" alt="" aria-hidden="true" />Add new workspace</button>
+                    <button className="workspaceAddAction" type="button" tabIndex={isOrgMenuOpen ? 0 : -1} onClick={() => { setIsOrgMenuOpen(false); onCreateWorkspace() }}><img src="/assets/workspace-menu-add.svg" alt="" aria-hidden="true" />Add new workspace</button>
                   </div>
                 </div>
-              )}
             </div>
             <button className="iconButton toggleButton" onClick={onToggle} aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
               <Icon src={isCollapsed ? icons.panelExpand : icons.panel} />
@@ -333,13 +358,13 @@ function Sidebar({ workspaces, activeWorkspace, onWorkspaceChange, onCreateWorks
                 <button type="button" className="clearSearch" aria-label="Clear search" onClick={() => onSearchChange('')}><Icon src={icons.searchClear} /></button>
               ) : <Icon src={icons.shortcut} />}
             </label>
-          <button className="plainButton" aria-label={canEditWorkspace ? 'New folder' : 'New folder unavailable with Viewer access'} title={isCollapsed ? 'New folder' : undefined} disabled={isNewFolderOpen || !canEditWorkspace} onClick={() => { if (isCollapsed) onStartSearch(); setIsNewFolderOpen(true) }}>
+          <button className="plainButton" aria-label={canEditWorkspace ? 'New folder' : 'New folder unavailable with Viewer access'} title={isCollapsed ? 'New folder' : undefined} disabled={isNewFolderOpen || !canEditWorkspace} onClick={() => { setIsOrgMenuOpen(false); setIsAccountMenuOpen(false); if (isCollapsed) onStartSearch(); setIsNewFolderOpen(true) }}>
             <Icon src={icons.folder} /><span className="sidebarLabel">New folder</span>
           </button>
         </div>
 
           <nav className={`folderList${isCollapsed || isSearching ? ' concealed' : ''}`} aria-label="Folders" aria-hidden={isCollapsed || isSearching}>
-            {isNewFolderOpen && <div className={`folderCreateRow${folderCreateError ? ' invalid' : ''}`}><Icon src={icons.folderCreate} /><input ref={newFolderInputRef} value={newFolderName} maxLength={64} placeholder="Enter your folder name" spellCheck={false} autoCapitalize="none" aria-label="Folder name" aria-invalid={Boolean(folderCreateError)} aria-describedby={folderCreateError ? 'folder-create-error' : undefined} onChange={(event) => { setNewFolderName(event.target.value); setFolderCreateError('') }} onKeyDown={(event) => { if (event.key === 'Enter') submitNewFolder(); else if (event.key === 'Escape') closeFolderEntry() }} /><button type="button" aria-label="Create folder" onClick={submitNewFolder}><Icon src={icons.folderCreateEnter} /></button>{folderCreateError && <span id="folder-create-error" role="alert">{folderCreateError}</span>}</div>}
+            {isNewFolderOpen && <div ref={newFolderRowRef} className={`folderCreateRow${folderCreateError ? ' invalid' : ''}`}><Icon src={icons.folderCreate} /><input ref={newFolderInputRef} value={newFolderName} maxLength={64} placeholder="Enter your folder name" spellCheck={false} autoCapitalize="none" aria-label="Folder name" aria-invalid={Boolean(folderCreateError)} aria-describedby={folderCreateError ? 'folder-create-error' : undefined} onChange={(event) => { setNewFolderName(event.target.value); setFolderCreateError('') }} onKeyDown={(event) => { if (event.key === 'Enter') submitNewFolder(); else if (event.key === 'Escape') closeFolderEntry() }} /><button type="button" aria-label="Create folder" onClick={submitNewFolder}><Icon src={icons.folderCreateEnter} /></button>{folderCreateError && <span id="folder-create-error" role="alert">{folderCreateError}</span>}</div>}
             {sidebarFolders.map((folder) => (
               <button className={`folderRow${isFolderNavigationActive && folder.name === activeFolderName ? ' active' : ''}`} key={folder.name} tabIndex={isCollapsed || isSearching ? -1 : 0} onClick={() => onOpenFolder(folder.name)}>
                 <span>{folder.name}</span><span>{folder.count}</span>
@@ -355,39 +380,39 @@ function Sidebar({ workspaces, activeWorkspace, onWorkspaceChange, onCreateWorks
         </div>
         <div className="accountControl" data-account-menu>
           {isAccountMenuOpen && (
-            <div className="accountMenu" role="menu" aria-label="Account menu">
+            <div ref={accountMenuRef} className="accountMenu" role="menu" aria-label="Account menu" onKeyDown={handleAccountMenuKeyDown}>
               <header className="accountIdentity">
                 <img src="/assets/account-menu-avatar.png" alt="" />
                 <div><strong>{accountName}</strong><span>michele@beam.app</span></div>
               </header>
-              <section className="accountPlan" aria-label="Current plan and usage">
+              <button className="accountPlan" type="button" role="menuitem" aria-label="Open Billing and usage, 1.2 GB of 5 GB used" onClick={() => { setIsAccountMenuOpen(false); onOpenBilling() }}>
                 <div className="accountPlanHeading"><strong>Free plan</strong><span>24% used</span></div>
                 <div className="accountUsageBody">
                   <div className="accountUsageTrack" aria-hidden="true"><span /></div>
-                  <div className="accountUsageMeta"><span>1.2 GB of 5 GB</span><button type="button" aria-label="Open billing and usage" onClick={() => { setIsAccountMenuOpen(false); onOpenBilling() }}><Icon src="/assets/account-menu-arrow.svg" /></button></div>
+                  <div className="accountUsageMeta"><span>1.2 GB of 5 GB</span><Icon src="/assets/account-menu-arrow.svg" /></div>
                 </div>
-              </section>
+              </button>
               <div className="accountMenuGroup">
                 <button type="button" role="menuitem" onClick={() => { setIsAccountMenuOpen(false); onOpenAccount() }}>Account settings</button>
                 <button type="button" role="menuitem" onClick={() => { setIsAccountMenuOpen(false); onOpenBilling() }}>Billing &amp; usage</button>
-                <div className="appearanceMenuControl" onMouseLeave={() => setIsAppearanceMenuOpen(false)}>
-                  <button className={isAppearanceMenuOpen ? 'submenuOpen' : ''} type="button" role="menuitem" aria-haspopup="menu" aria-expanded={isAppearanceMenuOpen} onClick={() => setIsAppearanceMenuOpen((open) => !open)} onMouseEnter={() => setIsAppearanceMenuOpen(true)}>
+                <div className="appearanceMenuControl">
+                  <button className={isAppearanceMenuOpen ? 'submenuOpen' : ''} type="button" role="menuitem" aria-haspopup="menu" aria-expanded={isAppearanceMenuOpen} onClick={() => setIsAppearanceMenuOpen((open) => !open)} onKeyDown={(event) => { if (event.key === 'ArrowRight') { event.preventDefault(); setIsAppearanceMenuOpen(true); window.requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.appearanceSubmenu button')?.focus()) } }}>
                     <span className="appearanceMenuLabel">Appearance</span><span className="accountMenuValue">{appearanceTheme[0].toUpperCase() + appearanceTheme.slice(1)} <span aria-hidden="true">›</span></span>
                   </button>
                   {isAppearanceMenuOpen && <div className="appearanceSubmenu" role="menu" aria-label="Appearance theme">
-                    {(['light', 'dark', 'system'] as const).map((theme) => <button className={appearanceTheme === theme ? 'selected' : ''} type="button" role="menuitemradio" aria-checked={appearanceTheme === theme} key={theme} onClick={() => { applyAppearanceTheme(theme); setAppearanceTheme(theme); setIsAppearanceMenuOpen(false) }}>
+                    {(['light', 'dark', 'system'] as const).map((theme) => <button className={appearanceTheme === theme ? 'selected' : ''} type="button" role="menuitemradio" aria-checked={appearanceTheme === theme} key={theme} onClick={() => { applyAppearanceTheme(theme); setAppearanceTheme(theme); setIsAppearanceMenuOpen(false); setIsAccountMenuOpen(false); window.requestAnimationFrame(() => accountTriggerRef.current?.focus()) }}>
                       <img className="appearanceThemeIcon" src={`/assets/appearance-${theme}.svg`} alt="" aria-hidden="true" /><span>{theme[0].toUpperCase() + theme.slice(1)}</span>{appearanceTheme === theme && <span className="appearanceCheck" aria-hidden="true">✓</span>}
                     </button>)}
                   </div>}
                 </div>
-                <button type="button" role="menuitem" onClick={() => setIsAccountMenuOpen(false)}>Help &amp; feedback</button>
+                <button type="button" role="menuitem" disabled title="Help and feedback is coming soon">Help &amp; feedback</button>
               </div>
               <div className="accountMenuGroup accountMenuFooter">
-                <button type="button" role="menuitem" onClick={() => setIsAccountMenuOpen(false)}>Sign out</button>
+                <button type="button" role="menuitem" disabled title="Sign out is unavailable in this local prototype">Sign out</button>
               </div>
             </div>
           )}
-          <button className={`accountRow${isAccountMenuOpen ? ' active' : ''}`} aria-label={`Open ${accountName} account menu`} aria-haspopup="menu" aria-expanded={isAccountMenuOpen} title={isCollapsed ? accountName : undefined} onClick={() => setIsAccountMenuOpen((open) => !open)}>
+          <button ref={accountTriggerRef} className={`accountRow${isAccountMenuOpen ? ' active' : ''}`} aria-label={`Open ${accountName} account menu`} aria-haspopup="menu" aria-expanded={isAccountMenuOpen} title={isCollapsed ? accountName : undefined} onClick={() => { setIsOrgMenuOpen(false); setIsAccountMenuOpen((open) => !open) }} onKeyDown={(event) => { if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); setIsAccountMenuOpen(true); window.requestAnimationFrame(() => { const items = accountMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'); items?.[event.key === 'ArrowUp' ? items.length - 1 : 0]?.focus() }) } }}>
             <img className="avatar" src={icons.avatar} alt={accountName} />
             <span className="sidebarLabel">{accountName}</span>
             <span className={`accountChevronIcon${isAccountMenuOpen ? ' open' : ''}`}><Icon src={isCollapsed ? icons.accountChevronCollapsed : icons.accountChevron} /></span>
@@ -489,7 +514,7 @@ function DeleteItemModal({ itemName, itemType, retention = '30 days', onConfirm,
   )
 }
 
-function FileTable({ rows = files, showHeader = true, onOpenFolder, onRenameFolder, onDeleteFolder }: { rows?: FileRow[]; showHeader?: boolean; onOpenFolder?: (name: string) => void; onRenameFolder?: (name: string) => void; onDeleteFolder?: (name: string) => void }) {
+function FileTable({ rows = files, showHeader = true, onOpenFolder, onOpenFile, onRenameFolder, onDeleteFolder }: { rows?: FileRow[]; showHeader?: boolean; onOpenFolder?: (name: string) => void; onOpenFile?: (file: FileRow) => void; onRenameFolder?: (name: string) => void; onDeleteFolder?: (name: string) => void }) {
   const [openMenu, setOpenMenu] = useState<string | null>(null)
 
   useEffect(() => {
@@ -514,9 +539,9 @@ function FileTable({ rows = files, showHeader = true, onOpenFolder, onRenameFold
     <div className="fileTable">
       {showHeader && <div className="tableRow tableHead"><div>Name</div><div>Size</div><div>Modified</div><div /></div>}
       {rows.map((file, index) => (
-        <div className={`tableRow${!showHeader && index === 0 ? ' first' : ''}${index === rows.length - 1 ? ' last' : ''}`} key={file.name}>
+        <div className={`tableRow${!showHeader && index === 0 ? ' first' : ''}${index === rows.length - 1 ? ' last' : ''}`} key={file.path ?? file.name}>
           <div className="fileName">
-            {file.kind === 'folder' && onOpenFolder ? <button className="fileLink" onClick={() => onOpenFolder(file.name)}>{file.name}</button> : <span>{file.name}</span>}
+            {file.kind === 'folder' && onOpenFolder ? <button className="fileLink" onClick={() => onOpenFolder(file.name)}>{file.name}</button> : file.kind === 'file' && onOpenFile ? <button className="fileLink searchFileLink" onClick={() => onOpenFile(file)}><span>{file.name}</span>{file.path && <small>{file.path}</small>}</button> : <span>{file.name}</span>}
             {file.badge && <span className="badge">{file.badge}</span>}
           </div>
           <div className="sizeCell">{file.size}</div>
@@ -527,16 +552,16 @@ function FileTable({ rows = files, showHeader = true, onOpenFolder, onRenameFold
               type="button"
               aria-label={`Actions for ${file.name}`}
               aria-haspopup="menu"
-              aria-expanded={openMenu === file.name}
-              onClick={() => setOpenMenu((current) => current === file.name ? null : file.name)}
+              aria-expanded={openMenu === (file.path ?? file.name)}
+              onClick={() => setOpenMenu((current) => current === (file.path ?? file.name) ? null : (file.path ?? file.name))}
             >
               <Icon src={icons.more} />
             </button>
-            {openMenu === file.name && (
+            {openMenu === (file.path ?? file.name) && (
               <div className="rowMenu" role="menu" aria-label={`Actions for ${file.name}`}>
-                <button type="button" role="menuitem" onClick={() => { setOpenMenu(null); onOpenFolder?.(file.name) }}><Icon src={icons.actionOpen} />Open</button>
-                <button type="button" role="menuitem" onClick={() => { setOpenMenu(null); onRenameFolder?.(file.name) }}><Icon src={icons.actionRename} />Rename</button>
-                <button type="button" role="menuitem" onClick={() => { setOpenMenu(null); onDeleteFolder?.(file.name) }}><Icon src={icons.actionDelete} />Delete</button>
+                <button type="button" role="menuitem" onClick={() => { setOpenMenu(null); if (file.kind === 'file') onOpenFile?.(file); else onOpenFolder?.(file.name) }}><Icon src={icons.actionOpen} />Open</button>
+                {file.kind === 'folder' && <button type="button" role="menuitem" onClick={() => { setOpenMenu(null); onRenameFolder?.(file.name) }}><Icon src={icons.actionRename} />Rename</button>}
+                {file.kind === 'folder' && <button type="button" role="menuitem" onClick={() => { setOpenMenu(null); onDeleteFolder?.(file.name) }}><Icon src={icons.actionDelete} />Delete</button>}
               </div>
             )}
           </div>
@@ -564,15 +589,22 @@ function formatDisplayFileSize(size: string) {
   return size.replace(/\s*(B|KB|MB|GB)$/i, ' $1')
 }
 
-function FolderDetail({ folderName, initialItems, onItemsChange, onBack, readOnly = false, defaultView = 'list', confirmDelete = true, trashRetention = '30 days' }: { folderName: string; initialItems: FolderFile[]; onItemsChange: (items: FolderFile[]) => void; onBack: () => void; readOnly?: boolean; defaultView?: 'list' | 'grid'; confirmDelete?: boolean; trashRetention?: string }) {
+function FolderDetail({ folderName, initialItems, initialSelectedFileName, onItemsChange, onBack, readOnly = false, defaultView = 'list', confirmDelete = true, trashRetention = '30 days' }: { folderName: string; initialItems: FolderFile[]; initialSelectedFileName?: string | null; onItemsChange: (items: FolderFile[]) => void; onBack: () => void; readOnly?: boolean; defaultView?: 'list' | 'grid'; confirmDelete?: boolean; trashRetention?: string }) {
   const [folderItems, setFolderItems] = useState<FolderFile[]>(initialItems)
-  const [selectedFile, setSelectedFile] = useState<FolderFile | null>(null)
+  const [selectedFile, setSelectedFile] = useState<FolderFile | null>(() => {
+    const requested = initialSelectedFileName ?? new URLSearchParams(window.location.search).get('file') ?? window.sessionStorage.getItem('beam-open-file')
+    window.sessionStorage.removeItem('beam-open-file')
+    return initialItems.find((file) => file.name === requested) ?? null
+  })
+  const [shareFileName, setShareFileName] = useState<string | null>(null)
+  const [focusPreviewOnOpen, setFocusPreviewOnOpen] = useState(() => { const shouldFocus = Boolean(initialSelectedFileName || new URLSearchParams(window.location.search).get('file') || window.sessionStorage.getItem('beam-open-file-focus')); window.sessionStorage.removeItem('beam-open-file-focus'); return shouldFocus })
   const [infoFile, setInfoFile] = useState<FolderFile | null>(null)
   const [copyFeedback, setCopyFeedback] = useState<CopyFeedback>(null)
   const [downloadFeedback, setDownloadFeedback] = useState<DownloadFeedback>(null)
   const [openFileMenu, setOpenFileMenu] = useState<number | null>(null)
   const [fileToDelete, setFileToDelete] = useState<{ file: FolderFile; index: number } | null>(null)
   const [isDraggingFiles, setIsDraggingFiles] = useState(false)
+  const [pendingUpload, setPendingUpload] = useState<File[] | null>(null)
   const [viewMode, setViewMode] = useState<'list' | 'grid'>(defaultView)
   const [splitPercent, setSplitPercent] = useState(50)
   const [isResizing, setIsResizing] = useState(false)
@@ -584,12 +616,22 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack, readOnl
     if (selectedFile === file) setSelectedFile(null)
   }
   const previewLayoutRef = useRef<HTMLDivElement>(null)
+  const previewOriginRef = useRef<HTMLElement | null>(null)
   const isResizingRef = useRef(false)
   const dragDepthRef = useRef(0)
   const copyFeedbackTimerRef = useRef<number | null>(null)
   const downloadFeedbackTimerRef = useRef<number | null>(null)
   const minimumDetailWidth = 350
   const minimumPreviewWidth = 513
+  const openPreview = (file: FolderFile, origin: HTMLElement, keyboard: boolean) => { previewOriginRef.current = origin; setFocusPreviewOnOpen(keyboard); setSelectedFile(file) }
+  const closePreview = (restoreFocus = false) => {
+    setSelectedFile(null)
+    setShareFileName(null)
+    if (restoreFocus) window.requestAnimationFrame(() => {
+      if (previewOriginRef.current?.isConnected) previewOriginRef.current.focus()
+      else document.querySelector<HTMLElement>('.detailTable, .fileGrid')?.focus()
+    })
+  }
 
   const constrainSplit = (desiredLeftWidth: number, totalWidth: number) => {
     const minimumLeft = Math.min(minimumDetailWidth, totalWidth / 2)
@@ -608,7 +650,11 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack, readOnl
       if (!(event.target as HTMLElement).closest('[data-detail-row-menu]')) setOpenFileMenu(null)
     }
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpenFileMenu(null)
+      if (event.key === 'Escape') {
+        const index = openFileMenu
+        setOpenFileMenu(null)
+        window.requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-file-menu-index="${index}"]`)?.focus())
+      }
     }
     document.addEventListener('mousedown', closeMenu)
     document.addEventListener('keydown', closeOnEscape)
@@ -618,7 +664,19 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack, readOnl
     }
   }, [openFileMenu])
 
-  const addFiles = (incomingFiles: FileList | File[]) => {
+  const handleFileMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+    const current = items.indexOf(document.activeElement as HTMLButtonElement)
+    let next = current
+    if (event.key === 'ArrowDown') next = (current + 1) % items.length
+    else if (event.key === 'ArrowUp') next = (current - 1 + items.length) % items.length
+    else if (event.key === 'Home') next = 0
+    else if (event.key === 'End') next = items.length - 1
+    else return
+    event.preventDefault(); items[next]?.focus()
+  }
+
+  const commitFiles = (incomingFiles: FileList | File[]) => {
     if (readOnly) return
     const addedFiles = Array.from(incomingFiles).map((file) => ({
       name: file.name,
@@ -632,6 +690,12 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack, readOnl
       onItemsChange(next)
       return next
     })
+  }
+
+  const queueFiles = (incomingFiles: FileList | File[]) => {
+    if (readOnly) return
+    const files = Array.from(incomingFiles)
+    if (files.length) setPendingUpload(files)
   }
 
   const downloadFile = (file: FolderFile) => {
@@ -689,7 +753,7 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack, readOnl
       event.preventDefault()
       dragDepthRef.current = 0
       setIsDraggingFiles(false)
-      if (event.dataTransfer?.files.length) addFiles(event.dataTransfer.files)
+      if (event.dataTransfer?.files.length) queueFiles(event.dataTransfer.files)
     }
     window.addEventListener('dragenter', handleDragEnter)
     window.addEventListener('dragover', handleDragOver)
@@ -746,36 +810,35 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack, readOnl
         <button onClick={onBack}>My Beam</button><span>/</span><span>{folderName}</span>
       </nav>
       {!readOnly && <div className="uploadActions">
-        <label className="uploadButton"><Icon src={icons.upload} /><span>Upload file</span><input type="file" multiple onChange={(event) => { if (event.target.files) addFiles(event.target.files); event.target.value = '' }} /></label>
+        <label className="uploadButton"><Icon src={icons.upload} /><span>Upload file</span><input type="file" multiple onChange={(event) => { if (event.target.files) queueFiles(event.target.files); event.target.value = '' }} /></label>
         <span>or drag and drop</span>
       </div>}
     </div>
   )
 
   const detailTable = (
-    <div className="detailTable">
-      <div className="detailRow detailTableHead"><div>Name</div><div>Kind</div><div>Size</div><div>Modified</div><div /></div>
+    <div className="detailTable" role="table" tabIndex={-1} aria-label={`${folderName} files`}>
+      <div className="detailRow detailTableHead" role="row"><div role="columnheader">Name</div><div role="columnheader">Kind</div><div role="columnheader">Size</div><div role="columnheader">Modified</div><div role="columnheader"><span className="srOnly">Actions</span></div></div>
       {folderItems.map((file, index) => (
         <div
           className={`detailRow selectable${selectedFile?.name === file.name ? ' selected' : ''}${index === folderItems.length - 1 ? ' last' : ''}`}
           key={`${file.name}-${index}`}
-          role="button"
-          tabIndex={0}
-          onClick={() => setSelectedFile(file)}
-          onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedFile(file) }}
+          role="row"
         >
-          <div>{file.name}</div><div>{file.kind}</div><div>{file.size}</div><div>{file.modified}</div>
-          <div className="detailMore" data-detail-row-menu onClick={(event) => event.stopPropagation()}>
+          <div role="cell"><button className="fileNameButton" type="button" title={file.name} onClick={(event) => openPreview(file, event.currentTarget, event.detail === 0)}>{file.name}</button></div><div role="cell">{file.kind}</div><div role="cell">{file.size}</div><div role="cell">{file.modified}</div>
+          <div role="cell" className="detailMore" data-detail-row-menu>
             <button
+              data-file-menu-index={index}
               className="moreButton"
               type="button"
               aria-label={`Actions for ${file.name}`}
               aria-haspopup="menu"
               aria-expanded={openFileMenu === index}
               onClick={() => setOpenFileMenu((current) => current === index ? null : index)}
+              onKeyDown={(event) => { if (event.key === 'ArrowDown') { event.preventDefault(); setOpenFileMenu(index); window.requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-menu-for="${index}"] [role="menuitem"]`)?.focus()) } }}
             ><Icon src={icons.more} /></button>
             {openFileMenu === index && (
-              <div className="rowMenu detailRowMenu" role="menu" aria-label={`Actions for ${file.name}`}>
+              <div data-menu-for={index} className="rowMenu detailRowMenu" role="menu" aria-label={`Actions for ${file.name}`} onKeyDown={handleFileMenuKeyDown}>
                 <button className="darkIcon" type="button" role="menuitem" onClick={() => { setInfoFile(file); setOpenFileMenu(null) }}><Icon src={icons.previewInfo} />Info</button>
                 <button className="darkIcon" type="button" role="menuitem" onClick={() => { void copyFileLink(file); setOpenFileMenu(null) }}><Icon src={icons.previewCopy} />Copy link</button>
                 <button className="darkIcon" type="button" role="menuitem" onClick={() => { downloadFile(file); setOpenFileMenu(null) }}><Icon src={icons.previewDownload} />Download</button>
@@ -789,27 +852,23 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack, readOnl
   )
 
   const detailGridView = (
-    <div className="fileGrid" role="list" aria-label={`${folderName} files`}>
+    <div className="fileGrid" role="list" tabIndex={-1} aria-label={`${folderName} files`}>
       {folderItems.map((file, index) => (
-        <button
+        <article
           className={`fileGridCard${selectedFile?.name === file.name ? ' selected' : ''}`}
-          type="button"
           role="listitem"
           key={`${file.name}-${index}`}
-          title={file.name}
-          onClick={() => setSelectedFile(file)}
         >
-          <span className="fileGridPreview"><Icon src={icons.fileDocument} /></span>
-          <span className="fileGridName">{file.name}</span>
-        </button>
+          <button className="fileGridOpen" type="button" title={file.name} aria-label={`Open ${file.name}`} onClick={(event) => openPreview(file, event.currentTarget, event.detail === 0)}><span className="fileGridPreview"><Icon src={icons.fileDocument} /></span><span className="fileGridName">{file.name}</span></button>
+        </article>
       ))}
     </div>
   )
 
   const viewTabs = (
     <div className="viewTabs" role="tablist" aria-label="Folder view">
-      <button className={viewMode === 'list' ? 'active' : ''} type="button" role="tab" aria-selected={viewMode === 'list'} onClick={() => setViewMode('list')}><Icon src={icons.viewList} />List</button>
-      <button className={viewMode === 'grid' ? 'active' : ''} type="button" role="tab" aria-selected={viewMode === 'grid'} onClick={() => setViewMode('grid')}><Icon src={icons.viewGrid} />Grid</button>
+      <button className={viewMode === 'list' ? 'active' : ''} type="button" role="tab" tabIndex={viewMode === 'list' ? 0 : -1} aria-selected={viewMode === 'list'} onKeyDown={(event) => { if (event.key === 'ArrowRight') { setViewMode('grid'); (event.currentTarget.nextElementSibling as HTMLButtonElement)?.focus() } }} onClick={() => setViewMode('list')}><Icon src={icons.viewList} />List</button>
+      <button className={viewMode === 'grid' ? 'active' : ''} type="button" role="tab" tabIndex={viewMode === 'grid' ? 0 : -1} aria-selected={viewMode === 'grid'} onKeyDown={(event) => { if (event.key === 'ArrowLeft') { setViewMode('list'); (event.currentTarget.previousElementSibling as HTMLButtonElement)?.focus() } }} onClick={() => setViewMode('grid')}><Icon src={icons.viewGrid} />Grid</button>
     </div>
   )
 
@@ -818,7 +877,7 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack, readOnl
       {selectedFile ? (
         <div className={`previewLayout${isResizing ? ' resizing' : ''}`} ref={previewLayoutRef}>
           <div className="detailMain" style={{ flexBasis: `${splitPercent}%` }}>{detailHeader}{viewMode === 'grid' ? detailGridView : detailTable}</div>
-          <FilePreview file={selectedFile} copyFeedback={copyFeedback?.fileName === selectedFile.name ? copyFeedback : null} onCopyLink={() => copyFileLink(selectedFile)} onDownload={() => downloadFile(selectedFile)} onInfo={() => setInfoFile(selectedFile)} onClose={() => setSelectedFile(null)} />
+          <FilePreview file={selectedFile} focusOnOpen={focusPreviewOnOpen} openShareInitially={shareFileName === selectedFile.name} copyFeedback={copyFeedback?.fileName === selectedFile.name ? copyFeedback : null} onCopyLink={() => copyFileLink(selectedFile)} onDownload={() => downloadFile(selectedFile)} onInfo={() => setInfoFile(selectedFile)} onClose={closePreview} />
           <div
             className="paneHandle"
             style={{ left: `${splitPercent}%` }}
@@ -854,7 +913,7 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack, readOnl
               <h2 id="detail-empty-title">No files yet</h2>
               <p>This folder is empty. Upload a file to get started.</p>
             </div>
-            {!readOnly && <label className="detailEmptyUpload"><Icon src={icons.upload} /><span>Upload file</span><input type="file" multiple onChange={(event) => { if (event.target.files) addFiles(event.target.files); event.target.value = '' }} /></label>}
+            {!readOnly && <label className="detailEmptyUpload"><Icon src={icons.upload} /><span>Upload file</span><input type="file" multiple onChange={(event) => { if (event.target.files) queueFiles(event.target.files); event.target.value = '' }} /></label>}
           </section>
         </>
       ) : <>{detailHeader}<div className="detailGrid"><div className="detailListPane">{viewMode === 'grid' ? detailGridView : detailTable}<div className="viewTabsDock">{viewTabs}</div></div><RecentActivity /></div></>}
@@ -862,7 +921,7 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack, readOnl
         <div className="dropOverlay" role="status" aria-live="polite">
           <div className="dropZone">
             <div className="dropPrompt">
-              <div className="dropMessage"><span>Drop item to upload file to</span><span className="dropDestination"><Icon src={icons.dropFolder} />{folderName}</span></div>
+              <div className="dropMessage"><span>Drop files to upload to</span><span className="dropDestination"><Icon src={icons.dropFolder} />{folderName}</span></div>
             </div>
           </div>
         </div>
@@ -871,6 +930,19 @@ function FolderDetail({ folderName, initialItems, onItemsChange, onBack, readOnl
       {copyFeedback && !selectedFile && <CopyTooltip feedback={copyFeedback} global />}
       {downloadFeedback && <DownloadToast feedback={downloadFeedback} onRetry={() => downloadFile(downloadFeedback.file)} onClose={() => setDownloadFeedback(null)} />}
       {fileToDelete && <DeleteItemModal itemName={fileToDelete.file.name} itemType="file" retention={trashRetention} onClose={() => setFileToDelete(null)} onConfirm={() => { removeFile(fileToDelete.file, fileToDelete.index); setFileToDelete(null) }} />}
+      {pendingUpload && <UploadDemoOverlay
+        files={pendingUpload.map((file) => ({
+          name: file.name,
+          size: formatDisplayFileSize(formatFileSize(file.size)),
+          weight: file.size,
+          icon: /\.(?:jpe?g|png|gif|webp)$/i.test(file.name)
+            ? '/assets/upload-image-file.svg'
+            : /\.pdf$/i.test(file.name) ? '/assets/drop-file-type.svg' : '/assets/upload-file.svg',
+        }))}
+        autoCloseOnComplete
+        onClose={() => setPendingUpload(null)}
+        onComplete={() => commitFiles(pendingUpload)}
+      />}
     </div>
   )
 }
@@ -920,7 +992,7 @@ function FileActivityModal({ file, onClose }: { file: FolderFile; onClose: () =>
 }
 
 function CopyTooltip({ feedback, global = false }: { feedback: NonNullable<CopyFeedback>; global?: boolean }) {
-  return <span className={`copyTooltip ${feedback.status}${global ? ' global' : ''}`} role="status" aria-live="polite">{feedback.status === 'success' ? 'Link-copied' : 'Copy link failed'}</span>
+  return <span className={`copyTooltip ${feedback.status}${global ? ' global' : ''}`} role="status" aria-live="polite">{feedback.status === 'success' ? 'Link copied' : 'Copy link failed'}</span>
 }
 
 function DownloadToast({ feedback, onRetry, onClose }: { feedback: NonNullable<DownloadFeedback>; onRetry: () => void; onClose: () => void }) {
@@ -952,12 +1024,37 @@ const editorIcons = {
 } as const
 
 function TextEditorToolbar({ position, blockStyle, isBulleted, onFormat }: { position: EditorToolbarPosition; blockStyle: 'Header 1' | 'Body'; isBulleted: boolean; onFormat: (command: string, value?: string) => void }) {
-  const [isHeadingMenuOpen, setIsHeadingMenuOpen] = useState(false)
-  const [openEditorPanel, setOpenEditorPanel] = useState<'color' | 'link' | null>(null)
+  const [openEditorPanel, setOpenEditorPanel] = useState<'heading' | 'color' | 'link' | null>(null)
   const [linkUrl, setLinkUrl] = useState('')
   const [nextAlignment, setNextAlignment] = useState<'center' | 'right' | 'left'>('center')
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+  const closePanel = (restoreFocus = false) => {
+    const panel = openEditorPanel
+    setOpenEditorPanel(null)
+    if (restoreFocus && panel) window.requestAnimationFrame(() => triggerRefs.current[panel]?.focus())
+  }
+  useEffect(() => {
+    if (!openEditorPanel) return
+    const onPointerDown = (event: MouseEvent) => { if (!toolbarRef.current?.contains(event.target as Node)) closePanel() }
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); closePanel(true) } }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => { document.removeEventListener('mousedown', onPointerDown); document.removeEventListener('keydown', onKeyDown) }
+  }, [openEditorPanel])
+  const menuKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'))
+    const current = items.indexOf(document.activeElement as HTMLButtonElement)
+    let next = current
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') next = (current + 1) % items.length
+    else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') next = (current - 1 + items.length) % items.length
+    else if (event.key === 'Home') next = 0
+    else if (event.key === 'End') next = items.length - 1
+    else return
+    event.preventDefault(); items[next]?.focus()
+  }
   const applyBlockStyle = (style: 'Header 1' | 'Body') => {
-    setIsHeadingMenuOpen(false)
+    closePanel(true)
     onFormat('formatBlock', style === 'Header 1' ? 'h1' : 'p')
   }
   const applyLink = () => {
@@ -983,11 +1080,11 @@ function TextEditorToolbar({ position, blockStyle, isBulleted, onFormat }: { pos
     setNextAlignment(nextAlignment === 'center' ? 'right' : nextAlignment === 'right' ? 'left' : 'center')
   }
   return (
-    <div className="textEditorToolbar" style={position} role="toolbar" aria-label="Text formatting" onMouseDown={(event) => event.stopPropagation()} onContextMenu={(event) => event.preventDefault()}>
+    <div ref={toolbarRef} className="textEditorToolbar" style={position} role="toolbar" aria-label="Text formatting" onMouseDown={(event) => event.stopPropagation()} onContextMenu={(event) => event.preventDefault()}>
       <div className="editorGroup editorHeadingGroup">
-        <button className="editorHeadingTrigger" type="button" aria-haspopup="menu" aria-expanded={isHeadingMenuOpen} onMouseDown={(event) => event.preventDefault()} onClick={() => setIsHeadingMenuOpen((open) => !open)}><span>{blockStyle}</span><img className={isHeadingMenuOpen ? 'open' : ''} src={editorIcons.chevron} alt="" /></button>
-        {isHeadingMenuOpen && (
-          <div className="editorHeadingMenu" role="menu" aria-label="Text style">
+        <button ref={(node) => { triggerRefs.current.heading = node }} className="editorHeadingTrigger" type="button" aria-haspopup="menu" aria-expanded={openEditorPanel === 'heading'} onMouseDown={(event) => event.preventDefault()} onClick={() => setOpenEditorPanel((panel) => panel === 'heading' ? null : 'heading')}><span>{blockStyle}</span><img className={openEditorPanel === 'heading' ? 'open' : ''} src={editorIcons.chevron} alt="" /></button>
+        {openEditorPanel === 'heading' && (
+          <div className="editorHeadingMenu" role="menu" aria-label="Text style" onKeyDown={menuKeyDown}>
             <button className={blockStyle === 'Header 1' ? 'selected' : ''} type="button" role="menuitemradio" aria-checked={blockStyle === 'Header 1'} onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockStyle('Header 1')}><span>Header 1</span>{blockStyle === 'Header 1' && <img src={icons.downloadSuccess} alt="" />}</button>
             <button className={blockStyle === 'Body' ? 'selected' : ''} type="button" role="menuitemradio" aria-checked={blockStyle === 'Body'} onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockStyle('Body')}><span>Body</span>{blockStyle === 'Body' && <img src={icons.downloadSuccess} alt="" />}</button>
           </div>
@@ -998,36 +1095,40 @@ function TextEditorToolbar({ position, blockStyle, isBulleted, onFormat }: { pos
         {iconButton('Italic', editorIcons.italic, 'italic')}
         {iconButton('Underline', editorIcons.underline, 'underline')}
         <img className="editorDivider" src={editorIcons.divider} alt="" />
-        <button className="editorColor" type="button" aria-label="Text color" aria-expanded={openEditorPanel === 'color'} title="Text color" onMouseDown={(event) => event.preventDefault()} onClick={() => setOpenEditorPanel((panel) => panel === 'color' ? null : 'color')}><span /></button>
+        <button ref={(node) => { triggerRefs.current.color = node }} className="editorColor" type="button" aria-haspopup="menu" aria-label="Text color" aria-expanded={openEditorPanel === 'color'} title="Text color" onMouseDown={(event) => event.preventDefault()} onClick={() => setOpenEditorPanel((panel) => panel === 'color' ? null : 'color')}><span /></button>
         <img className="editorDivider" src={editorIcons.divider} alt="" />
         <button type="button" aria-label={`Align ${nextAlignment}`} title={`Align ${nextAlignment}`} onMouseDown={(event) => event.preventDefault()} onClick={cycleAlignment}><span className={`editorAlignIcon ${nextAlignment}`} aria-hidden="true"><i /><i /><i /><i /></span></button>
         <button className={isBulleted ? 'active' : ''} type="button" aria-label={isBulleted ? 'Remove bulleted list' : 'Bulleted list'} aria-pressed={isBulleted} title={isBulleted ? 'Remove bulleted list' : 'Bulleted list'} onMouseDown={(event) => event.preventDefault()} onClick={() => onFormat('insertUnorderedList')}><img src={editorIcons.list} alt="" /></button>
         <img className="editorDivider" src={editorIcons.divider} alt="" />
-        <button type="button" aria-label="Add link" aria-expanded={openEditorPanel === 'link'} title="Add link" onMouseDown={(event) => event.preventDefault()} onClick={() => setOpenEditorPanel((panel) => panel === 'link' ? null : 'link')}><img src={editorIcons.link} alt="" /></button>
+        <button ref={(node) => { triggerRefs.current.link = node }} type="button" aria-haspopup="dialog" aria-label="Add link" aria-expanded={openEditorPanel === 'link'} title="Add link" onMouseDown={(event) => event.preventDefault()} onClick={() => setOpenEditorPanel((panel) => panel === 'link' ? null : 'link')}><img src={editorIcons.link} alt="" /></button>
         <label className="editorImageButton" title="Add image"><img src={editorIcons.image} alt="" /><input type="file" accept="image/*" onChange={(event) => { insertImage(event.target.files?.[0]); event.target.value = '' }} /></label>
-        {openEditorPanel === 'color' && <div className="editorColorMenu" aria-label="Text colors">{['#0a0a0a', '#29323d', '#0d76f2', '#f24b0d', '#810718'].map((color) => <button type="button" key={color} aria-label={`Use ${color}`} style={{ backgroundColor: color }} onMouseDown={(event) => event.preventDefault()} onClick={() => { onFormat('foreColor', color); setOpenEditorPanel(null) }} />)}</div>}
-        {openEditorPanel === 'link' && <form className="editorLinkMenu" onSubmit={(event) => { event.preventDefault(); applyLink() }}><input autoFocus value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} placeholder="https://example.com" aria-label="Link URL" /><button type="submit" disabled={!linkUrl.trim()}>Apply</button></form>}
+        {openEditorPanel === 'color' && <div className="editorColorMenu" role="menu" aria-label="Text colors" onKeyDown={menuKeyDown}>{['#0a0a0a', '#29323d', '#0d76f2', '#f24b0d', '#810718'].map((color) => <button type="button" role="menuitem" key={color} aria-label={`Use ${color}`} style={{ backgroundColor: color }} onMouseDown={(event) => event.preventDefault()} onClick={() => { onFormat('foreColor', color); closePanel(true) }} />)}</div>}
+        {openEditorPanel === 'link' && <form className="editorLinkMenu" role="dialog" aria-label="Add link" onSubmit={(event) => { event.preventDefault(); applyLink() }}><input autoFocus value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} placeholder="https://example.com" aria-label="Link URL" /><button type="submit" disabled={!linkUrl.trim()}>Apply</button></form>}
       </div>
     </div>
   )
 }
 
-function FilePreview({ file, copyFeedback, onCopyLink, onDownload, onInfo, onClose }: { file: FolderFile; copyFeedback: CopyFeedback; onCopyLink: () => void; onDownload: () => void; onInfo: () => void; onClose: () => void }) {
+function FilePreview({ file, focusOnOpen = false, openShareInitially = false, copyFeedback, onCopyLink, onDownload, onInfo, onClose }: { file: FolderFile; focusOnOpen?: boolean; openShareInitially?: boolean; copyFeedback: CopyFeedback; onCopyLink: () => void; onDownload: () => void; onInfo: () => void; onClose: (restoreFocus?: boolean) => void }) {
   const [loadState, setLoadState] = useState<'loaded' | 'loading' | 'error'>(file.previewAvailable === false ? 'error' : 'loaded')
-  const [isShareOpen, setIsShareOpen] = useState(false)
+  const [isShareOpen, setIsShareOpen] = useState(openShareInitially)
   const [editorToolbarPosition, setEditorToolbarPosition] = useState<EditorToolbarPosition | null>(null)
   const [editorBlockStyle, setEditorBlockStyle] = useState<'Header 1' | 'Body'>('Body')
   const [isEditorBulleted, setIsEditorBulleted] = useState(false)
   const retryTimerRef = useRef<number | null>(null)
   const previewDocumentRef = useRef<HTMLElement>(null)
   const editorSelectionRef = useRef<Range | null>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const shareTriggerRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     setLoadState(file.previewAvailable === false ? 'error' : 'loaded')
+    setIsShareOpen(openShareInitially)
+    if (focusOnOpen) window.requestAnimationFrame(() => closeButtonRef.current?.focus({ preventScroll: true }))
     return () => {
       if (retryTimerRef.current !== null) window.clearTimeout(retryTimerRef.current)
     }
-  }, [file])
+  }, [file, focusOnOpen, openShareInitially])
 
   useEffect(() => {
     const closeEditor = (event: MouseEvent) => {
@@ -1041,18 +1142,25 @@ function FilePreview({ file, copyFeedback, onCopyLink, onDownload, onInfo, onClo
   useEffect(() => {
     if (!isShareOpen) return
     const closeShare = (event: MouseEvent) => {
-      if (!(event.target as HTMLElement).closest('[data-share-control]')) setIsShareOpen(false)
-    }
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsShareOpen(false)
+      if (!(event.target as HTMLElement).closest('[data-share-control]')) { setIsShareOpen(false); window.requestAnimationFrame(() => shareTriggerRef.current?.focus()) }
     }
     document.addEventListener('mousedown', closeShare)
-    document.addEventListener('keydown', closeOnEscape)
     return () => {
       document.removeEventListener('mousedown', closeShare)
-      document.removeEventListener('keydown', closeOnEscape)
     }
   }, [isShareOpen])
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      if (editorToolbarPosition) setEditorToolbarPosition(null)
+      else if (isShareOpen) { setIsShareOpen(false); window.requestAnimationFrame(() => shareTriggerRef.current?.focus()) }
+      else onClose(true)
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [editorToolbarPosition, isShareOpen, onClose])
 
   const retryLoading = () => {
     setLoadState('loading')
@@ -1103,7 +1211,7 @@ function FilePreview({ file, copyFeedback, onCopyLink, onDownload, onInfo, onClo
 
   return (
     <aside className="filePreview" aria-label={`Preview of ${file.name}`}>
-      <div className="previewTitle"><span>{file.name}</span><button onClick={onClose}><Icon src={icons.previewClose} />Close</button></div>
+      <div className="previewTitle"><span>{file.name}</span><button ref={closeButtonRef} type="button" onClick={(event) => onClose(event.detail === 0)}><Icon src={icons.previewClose} />Close</button></div>
       <div className="previewCard">
         <div className="previewToolbar">
           <div className="fileMetadata">
@@ -1112,14 +1220,14 @@ function FilePreview({ file, copyFeedback, onCopyLink, onDownload, onInfo, onClo
           <div className="previewActions">
             <button onClick={onInfo}><Icon src={icons.previewInfo} />Info</button>
             <div className="shareControl" data-share-control>
-              <button className="shareButton" type="button" aria-haspopup="dialog" aria-expanded={isShareOpen} onClick={() => setIsShareOpen((open) => !open)}><Icon src={icons.previewShare} />Share</button>
+              <button ref={shareTriggerRef} className="shareButton" type="button" aria-haspopup="dialog" aria-expanded={isShareOpen} onClick={() => setIsShareOpen((open) => !open)}><Icon src={icons.previewShare} />Share</button>
               {isShareOpen && (
                 <section className="sharePopover" role="dialog" aria-label={`Share ${file.name}`}>
                   <img className="sharePopoverPointer" src="/assets/share-tooltip.svg" alt="" aria-hidden="true" />
                   <div className="sharePopoverBody">
                     <div className="sharePeople">
                       <div className="shareHeadingRow">
-                        <div className="shareHeading"><span>People with access on</span><img src="/assets/share-document.svg" alt="" aria-hidden="true" /><span>{file.name}</span></div>
+                        <div className="shareHeading"><span>People with access to</span><img src="/assets/share-document.svg" alt="" aria-hidden="true" /><span>{file.name}</span></div>
                         <div className="sharePeopleCount" aria-label="1 person has access"><img src="/assets/share-people.svg" alt="" aria-hidden="true" /><span>1</span></div>
                       </div>
                       <div className="shareMemberRow">
@@ -1128,8 +1236,8 @@ function FilePreview({ file, copyFeedback, onCopyLink, onDownload, onInfo, onClo
                       </div>
                     </div>
                     <div className="shareFooter">
-                      <button className="sharePermission" type="button">All people with access can edit<img src="/assets/share-extra-1.svg" alt="" /></button>
-                      <button className="shareCopyLink" type="button" onClick={onCopyLink}><img src={copyFeedback?.status === 'success' ? icons.downloadSuccess : copyFeedback?.status === 'failure' ? icons.previewClose : '/assets/share-chevron.svg'} alt="" />{copyFeedback?.status === 'success' ? 'Link-copied' : copyFeedback?.status === 'failure' ? 'Copy failed' : 'Copy-link'}</button>
+                      <button className="sharePermission" type="button" disabled aria-disabled="true" title="Permission is inherited from workspace access">All people with access can edit<img src="/assets/share-extra-1.svg" alt="" /></button>
+                      <button className="shareCopyLink" type="button" onClick={onCopyLink}><img src={copyFeedback?.status === 'success' ? icons.downloadSuccess : copyFeedback?.status === 'failure' ? icons.previewClose : '/assets/share-chevron.svg'} alt="" />{copyFeedback?.status === 'success' ? 'Link copied' : copyFeedback?.status === 'failure' ? 'Copy failed' : 'Copy link'}</button>
                     </div>
                   </div>
                 </section>
@@ -1189,7 +1297,48 @@ function Stats({ folderCount, fileCount, storageUsed }: { folderCount: number; f
   )
 }
 
+function ModalFocusManager() {
+  useEffect(() => {
+    let activeModal: HTMLElement | null = null
+    let returnFocus: HTMLElement | null = null
+    const focusableSelector = 'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])'
+    const syncModal = () => {
+      const modals = Array.from(document.querySelectorAll<HTMLElement>('[aria-modal="true"]'))
+      const topModal = modals.at(-1) ?? null
+      if (topModal === activeModal) return
+      if (!topModal && activeModal) {
+        document.body.style.overflow = ''
+        const target = returnFocus
+        activeModal = null; returnFocus = null
+        if (target?.isConnected) window.requestAnimationFrame(() => target.focus({ preventScroll: true }))
+        return
+      }
+      if (topModal) {
+        if (!activeModal) returnFocus = document.activeElement as HTMLElement
+        activeModal = topModal
+        document.body.style.overflow = 'hidden'
+        window.requestAnimationFrame(() => activeModal?.querySelector<HTMLElement>('[autofocus], button:not(:disabled), input:not(:disabled), [tabindex="0"]')?.focus({ preventScroll: true }))
+      }
+    }
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !activeModal) return
+      const controls = Array.from(activeModal.querySelectorAll<HTMLElement>(focusableSelector)).filter((control) => control.getClientRects().length > 0)
+      if (!controls.length) { event.preventDefault(); activeModal.focus(); return }
+      const first = controls[0]; const last = controls.at(-1)!
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    const observer = new MutationObserver(syncModal)
+    observer.observe(document.body, { childList: true, subtree: true })
+    document.addEventListener('keydown', trapFocus)
+    syncModal()
+    return () => { observer.disconnect(); document.removeEventListener('keydown', trapFocus); document.body.style.overflow = '' }
+  }, [])
+  return null
+}
+
 export default function App() {
+  const [showUploadDemo, setShowUploadDemo] = useState(() => new URLSearchParams(window.location.search).get('upload-demo') === '1')
   const [workspaces, setWorkspaces] = useState<Workspace[]>(readWorkspaces)
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(() => window.localStorage.getItem('beam-active-workspace') || 'personal')
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? workspaces[0]
@@ -1199,14 +1348,18 @@ export default function App() {
   const homeFiles = activeContent.files
   const folderContents = activeContent.folderContents
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
-  const [isSearching, setIsSearching] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchFilter, setSearchFilter] = useState<'all' | FileKind>('all')
+  const [isSearching, setIsSearching] = useState(() => Boolean(new URLSearchParams(window.location.search).get('search')?.trim()))
+  const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(window.location.search).get('search') ?? '')
+  const [searchFilter, setSearchFilter] = useState<'all' | FileKind>(() => { const filter = new URLSearchParams(window.location.search).get('filter'); return filter === 'folder' || filter === 'file' ? filter : 'all' })
   const [currentView, setCurrentView] = useState<AppView>(() => {
-    const requestedView = new URLSearchParams(window.location.search).get('view')
+    const searchParams = new URLSearchParams(window.location.search)
+    const requestedView = searchParams.get('view')
+    if (searchParams.get('upload-demo') === '1') return 'folder'
+    if (searchParams.get('folder')) return 'folder'
     return requestedView === 'settings' || requestedView === 'apiKeys' || requestedView === 'account' || requestedView === 'billing' ? requestedView : 'home'
   })
-  const [selectedFolderName, setSelectedFolderName] = useState('Folder 001')
+  const [selectedFolderName, setSelectedFolderName] = useState(() => new URLSearchParams(window.location.search).get('folder') || 'Folder 001')
+  const [selectedSearchFileName, setSelectedSearchFileName] = useState<string | null>(null)
   const [folderToRename, setFolderToRename] = useState<string | null>(null)
   const [folderToDelete, setFolderToDelete] = useState<string | null>(null)
   const [isEmptyCreateOpen, setIsEmptyCreateOpen] = useState(false)
@@ -1219,13 +1372,17 @@ export default function App() {
   const [accountSaveToast, setAccountSaveToast] = useState('')
   const [workspaceCreateToast, setWorkspaceCreateToast] = useState('')
   const [workspaceDeleteToast, setWorkspaceDeleteToast] = useState('')
-  const [isCreateWorkspaceOpen, setIsCreateWorkspaceOpen] = useState(false)
+  const [isCreateWorkspaceOpen, setIsCreateWorkspaceOpen] = useState(() => new URLSearchParams(window.location.search).get('create-workspace') === '1')
   const settingsSaveToastTimer = useRef<number | null>(null)
+  const accountSaveToastTimer = useRef<number | null>(null)
+  const workspaceCreateToastTimer = useRef<number | null>(null)
+  const workspaceDeleteToastTimer = useRef<number | null>(null)
   const skipNextWorkspaceContentSave = useRef(false)
   const workspaceBehavior = readWorkspaceBehavior(activeWorkspace.id)
 
   const normalizedQuery = searchQuery.trim().toLowerCase()
-  const searchResults = homeFiles.filter((file) =>
+  const nestedSearchFiles: FileRow[] = Object.entries(folderContents).flatMap(([folderName, nestedFiles]) => nestedFiles.map((file) => ({ ...file, kind: 'file' as const, folderName, path: `${folderName} / ${file.name}` })))
+  const searchResults = [...homeFiles, ...nestedSearchFiles].filter((file) =>
     (searchFilter === 'all' || file.kind === searchFilter) &&
     (!normalizedQuery || file.name.toLowerCase().includes(normalizedQuery)),
   )
@@ -1240,6 +1397,12 @@ export default function App() {
     }
     window.addEventListener('popstate', restoreViewFromUrl)
     return () => window.removeEventListener('popstate', restoreViewFromUrl)
+  }, [])
+
+  useEffect(() => () => {
+    [settingsSaveToastTimer, accountSaveToastTimer, workspaceCreateToastTimer, workspaceDeleteToastTimer].forEach((timer) => {
+      if (timer.current !== null) window.clearTimeout(timer.current)
+    })
   }, [])
 
   useEffect(() => {
@@ -1283,7 +1446,20 @@ export default function App() {
 
   const openFolder = (name: string) => {
     setSelectedFolderName(name)
+    setSelectedSearchFileName(null)
     openView('folder')
+    setSearchQuery('')
+    setIsSearching(false)
+    setSearchFilter('all')
+  }
+
+  const openSearchFile = (file: FileRow) => {
+    if (!file.folderName) return
+    setSelectedFolderName(file.folderName)
+    setSelectedSearchFileName(file.name)
+    window.sessionStorage.setItem('beam-open-file', file.name)
+    window.sessionStorage.setItem('beam-open-file-focus', '1')
+    setCurrentView('folder')
     setSearchQuery('')
     setIsSearching(false)
     setSearchFilter('all')
@@ -1336,7 +1512,7 @@ export default function App() {
 
   const showSettingsSaveToast = (changeCount: number) => {
     if (settingsSaveToastTimer.current !== null) window.clearTimeout(settingsSaveToastTimer.current)
-    setSettingsSaveToast(`${changeCount} ${changeCount === 1 ? 'change' : 'changes'} saved successfully`)
+    setSettingsSaveToast(`${changeCount} ${changeCount === 1 ? 'change' : 'changes'} saved.`)
     settingsSaveToastTimer.current = window.setTimeout(() => setSettingsSaveToast(''), 3000)
   }
 
@@ -1375,8 +1551,14 @@ export default function App() {
       } catch { /* Keep the account save available if prototype member data is invalid. */ }
     }
     setAccountName(name)
+    if (accountSaveToastTimer.current !== null) window.clearTimeout(accountSaveToastTimer.current)
     setAccountSaveToast(`${name} is now your display name.`)
-    window.setTimeout(() => setAccountSaveToast(''), 3000)
+    accountSaveToastTimer.current = window.setTimeout(() => setAccountSaveToast(''), 3000)
+  }
+  const showPasswordUpdateToast = () => {
+    if (accountSaveToastTimer.current !== null) window.clearTimeout(accountSaveToastTimer.current)
+    setAccountSaveToast('Your password was updated successfully.')
+    accountSaveToastTimer.current = window.setTimeout(() => setAccountSaveToast(''), 3000)
   }
 
   const createWorkspace = ({ name, invitations }: { name: string; invitations: Array<{ email: string; role: 'Admin' | 'Editor' | 'Viewer' }> }) => {
@@ -1398,7 +1580,8 @@ export default function App() {
     commitWorkspaceChange(workspaceId)
     commitView('home')
     setWorkspaceCreateToast(`${name} is ready to use.`)
-    window.setTimeout(() => setWorkspaceCreateToast(''), 3000)
+    if (workspaceCreateToastTimer.current !== null) window.clearTimeout(workspaceCreateToastTimer.current)
+    workspaceCreateToastTimer.current = window.setTimeout(() => setWorkspaceCreateToast(''), 3000)
   }
 
   const deleteWorkspace = (workspaceId: string) => {
@@ -1413,11 +1596,13 @@ export default function App() {
     commitWorkspaceChange('personal')
     commitView('home')
     setWorkspaceDeleteToast(`${workspaceToDelete?.name ?? 'Workspace'} was permanently deleted.`)
-    window.setTimeout(() => setWorkspaceDeleteToast(''), 3000)
+    if (workspaceDeleteToastTimer.current !== null) window.clearTimeout(workspaceDeleteToastTimer.current)
+    workspaceDeleteToastTimer.current = window.setTimeout(() => setWorkspaceDeleteToast(''), 3000)
   }
 
   return (
     <main className={`appShell${isSidebarCollapsed ? ' sidebarCollapsed' : ''}`}>
+      <ModalFocusManager />
       <Sidebar
         workspaces={workspaces}
         activeWorkspace={activeWorkspace}
@@ -1444,7 +1629,7 @@ export default function App() {
         onOpenBilling={() => { openView('billing'); setSearchQuery(''); setIsSearching(false) }}
       />
       <section className="content">
-        {currentView === 'billing' && !isSearching ? <BillingUsagePage key={activeWorkspace.id} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.name} storageUsedMb={Math.round(totalStorageBytes / (1024 * 1024))} /> : currentView === 'account' && !isSearching ? <AccountProfilePage displayName={accountName} onDisplayNameSave={saveAccountName} /> : currentView === 'settings' && !isSearching ? <SettingsPage key={activeWorkspace.id} workspace={activeWorkspace} storageUsedMb={Math.round(totalStorageBytes / (1024 * 1024))} onOpenApiKeys={() => openView('apiKeys')} onWorkspaceNameChange={renameWorkspace} canDeleteWorkspace={!initialWorkspaces.some((workspace) => workspace.id === activeWorkspace.id)} onDeleteWorkspace={deleteWorkspace} onDirtyChange={setSettingsDirty} onSaveSuccess={showSettingsSaveToast} leaveRequest={settingsLeaveRequest} onLeaveResolved={(proceed) => {
+        {currentView === 'billing' && !isSearching ? <BillingUsagePage key={activeWorkspace.id} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.name} storageUsedMb={Math.round(totalStorageBytes / (1024 * 1024))} /> : currentView === 'account' && !isSearching ? <AccountProfilePage displayName={accountName} onDisplayNameSave={saveAccountName} onPasswordUpdateSuccess={showPasswordUpdateToast} /> : currentView === 'settings' && !isSearching ? <SettingsPage key={activeWorkspace.id} workspace={activeWorkspace} storageUsedMb={Math.round(totalStorageBytes / (1024 * 1024))} onOpenApiKeys={() => openView('apiKeys')} onWorkspaceNameChange={renameWorkspace} canDeleteWorkspace={!initialWorkspaces.some((workspace) => workspace.id === activeWorkspace.id)} onDeleteWorkspace={deleteWorkspace} onDirtyChange={setSettingsDirty} onSaveSuccess={showSettingsSaveToast} leaveRequest={settingsLeaveRequest} onLeaveResolved={(proceed) => {
           if (!proceed) { setPendingView(null); setPendingWorkspaceId(null); return }
           setSettingsDirty(false)
           if (pendingWorkspaceId) { const nextWorkspaceId = pendingWorkspaceId; setPendingWorkspaceId(null); commitWorkspaceChange(nextWorkspaceId) }
@@ -1459,12 +1644,12 @@ export default function App() {
           <>
             <div className="searchFilters" aria-label="Search filters">
               {(['all', 'folder', 'file'] as const).map((filter) => (
-                <button className={searchFilter === filter ? 'active' : ''} key={filter} onClick={() => setSearchFilter(filter)}>
+                <button className={searchFilter === filter ? 'active' : ''} type="button" aria-pressed={searchFilter === filter} key={filter} onClick={() => setSearchFilter(filter)}>
                   {filter[0].toUpperCase() + filter.slice(1)}
                 </button>
               ))}
             </div>
-            <div className="contentGrid searchGrid"><FileTable rows={searchResults} showHeader={false} onOpenFolder={openFolder} onRenameFolder={activeWorkspace.role === 'Viewer' ? undefined : setFolderToRename} onDeleteFolder={activeWorkspace.role === 'Viewer' ? undefined : requestFolderDelete} /><Stats folderCount={folderRows.length} fileCount={totalFileCount} storageUsed={storageSummary} /></div>
+            <div className="contentGrid searchGrid">{searchResults.length ? <FileTable rows={searchResults} showHeader={false} onOpenFolder={openFolder} onOpenFile={openSearchFile} onRenameFolder={activeWorkspace.role === 'Viewer' ? undefined : setFolderToRename} onDeleteFolder={activeWorkspace.role === 'Viewer' ? undefined : requestFolderDelete} /> : <section className="searchEmptyState" role="status"><h2>No results found</h2><p>Try a different search or filter.</p></section>}<Stats folderCount={folderRows.length} fileCount={totalFileCount} storageUsed={storageSummary} /></div>
           </>
         ) : (
           <>
@@ -1474,7 +1659,7 @@ export default function App() {
                 <img className="emptyBeamIllustration emptyBeamIllustrationLight" src={icons.emptyFolders} alt="" aria-hidden="true" />
                 <img className="emptyBeamIllustration emptyBeamIllustrationDark" src="/assets/empty-folder-dark.svg" alt="" aria-hidden="true" />
                 <div className="emptyBeamCopy">
-                  <h2 id="empty-beam-title">No folder yet</h2>
+                  <h2 id="empty-beam-title">No folders yet</h2>
                   <p>Create a folder to get started.</p>
                 </div>
                 {activeWorkspace.role !== 'Viewer' && <button className="emptyBeamCreate" type="button" onClick={() => setIsEmptyCreateOpen(true)}><Icon src={icons.folder} />Create Folder</button>}
@@ -1493,6 +1678,7 @@ export default function App() {
       {folderToRename && <RenameFolderModal currentName={folderToRename} existingNames={folderRows.map((folder) => folder.name)} onRename={renameFolder} onClose={() => setFolderToRename(null)} />}
       {folderToDelete && <DeleteItemModal itemName={folderToDelete} itemType="folder" retention={workspaceBehavior.trashRetention} onConfirm={() => removeFolder(folderToDelete)} onClose={() => setFolderToDelete(null)} />}
       {isEmptyCreateOpen && <NewFolderModal existingNames={folderRows.map((folder) => folder.name)} onCreate={(name) => { createFolder(name); setIsEmptyCreateOpen(false) }} onClose={() => setIsEmptyCreateOpen(false)} />}
+      {showUploadDemo && <UploadDemoOverlay onClose={() => { setShowUploadDemo(false); const url = new URL(window.location.href); url.searchParams.delete('upload-demo'); window.history.replaceState({}, '', url) }} />}
     </main>
   )
 }

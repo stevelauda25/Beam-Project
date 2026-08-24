@@ -3,9 +3,11 @@ import ProgressBar from './ProgressBar'
 import SelectControl from './SelectControl'
 import Toggle from './Toggle'
 import WorkspaceAvatar from './WorkspaceAvatar'
+import { validateWorkspaceName } from '../utils/workspaceName'
 
 type SettingsPageProps = {
   workspace: { id: string; name: string; role: 'Owner' | 'Admin' | 'Editor' | 'Viewer' }
+  existingWorkspaceNames?: string[]
   storageUsedMb: number
   onOpenApiKeys: () => void
   onWorkspaceNameChange: (workspaceId: string, name: string) => void
@@ -45,6 +47,19 @@ const readMembers = (workspaceId: string) => {
   catch { return defaultMembers(workspaceId) }
 }
 
+const readKnownWorkspaceNames = () => {
+  const builtIn = [{ id: 'personal', name: 'Personal' }, { id: 'company-abc', name: 'Company ABC' }, { id: 'company-xyz', name: 'Company XYZ' }]
+  let created: Array<{ id: string; name: string }> = []
+  try { created = JSON.parse(window.localStorage.getItem('beam-created-workspaces-v1') ?? '[]') }
+  catch { /* Ignore malformed prototype storage and retain built-in names. */ }
+  return [...builtIn, ...created].map((candidate) => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(`beam-settings-v3-${candidate.id}`) ?? '{}') as { workspaceName?: string }
+      return saved.workspaceName || candidate.name
+    } catch { return candidate.name }
+  })
+}
+
 const icons = {
   user: '/assets/settings-edit.svg', edit: '/assets/settings-chevron.svg', clock: '/assets/settings-clock.svg', chevron: '/assets/settings-user.svg',
   list: '/assets/settings-info.svg', info: '/assets/settings-check.svg', check: '/assets/settings-list.svg', x: '/assets/settings-x.svg',
@@ -70,7 +85,7 @@ const settingLabels: Record<keyof SavedSettings, string> = {
 
 const displaySettingValue = (value: string | boolean) => typeof value === 'boolean' ? (value ? 'On' : 'Off') : value
 
-export default function SettingsPage({ workspace, storageUsedMb, onOpenApiKeys, onWorkspaceNameChange, canDeleteWorkspace, onDeleteWorkspace, onDirtyChange, onSaveSuccess, leaveRequest, onLeaveResolved }: SettingsPageProps) {
+export default function SettingsPage({ workspace, existingWorkspaceNames = [], storageUsedMb, onOpenApiKeys, onWorkspaceNameChange, canDeleteWorkspace, onDeleteWorkspace, onDirtyChange, onSaveSuccess, leaveRequest, onLeaveResolved }: SettingsPageProps) {
   const canManage = workspace.role === 'Owner' || workspace.role === 'Admin'
   const canEditContent = workspace.role !== 'Viewer'
   const visibleSections = workspace.role === 'Viewer' ? sections.filter(([id]) => ['general', 'members-access', 'files-storage', 'sharing'].includes(id)) : sections
@@ -90,7 +105,8 @@ export default function SettingsPage({ workspace, storageUsedMb, onOpenApiKeys, 
   const [linkExpiry, setLinkExpiry] = useState(initial.linkExpiry)
   const [externalSharing, setExternalSharing] = useState(initial.externalSharing)
   const [securityAlerts, setSecurityAlerts] = useState(initial.securityAlerts)
-  const [activeSection, setActiveSection] = useState('general')
+  const [activeSection, setActiveSection] = useState(() => { const requested = new URLSearchParams(window.location.search).get('section'); return sections.some(([id]) => id === requested) ? requested! : 'general' })
+  const contentRef = useRef<HTMLDivElement>(null)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [utilityDialog, setUtilityDialog] = useState<'sessions' | null>(null)
   const [isReviewOpen, setIsReviewOpen] = useState(false)
@@ -158,8 +174,9 @@ export default function SettingsPage({ workspace, storageUsedMb, onOpenApiKeys, 
   }
 
   const saveWorkspaceName = () => {
-    const nextName = workspaceNameDraft.trim()
-    if (!nextName) { setWorkspaceNameError('Workspace name is required'); workspaceNameInputRef.current?.focus(); return }
+    const validation = validateWorkspaceName(workspaceNameDraft, existingWorkspaceNames.length ? existingWorkspaceNames : readKnownWorkspaceNames(), workspace.name)
+    if (!validation.valid) { setWorkspaceNameError(validation.error); workspaceNameInputRef.current?.focus(); return }
+    const nextName = validation.name
     setWorkspaceName(nextName)
     setWorkspaceNameDraft(nextName)
     setWorkspaceNameError('')
@@ -227,8 +244,11 @@ export default function SettingsPage({ workspace, storageUsedMb, onOpenApiKeys, 
 
   const openSection = (id: string) => {
     setActiveSection(id)
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    const url = new URL(window.location.href); url.searchParams.set('section', id); window.history.pushState({}, '', url)
   }
+
+  useEffect(() => { contentRef.current?.querySelectorAll<HTMLElement>(':scope > section').forEach((section) => { section.hidden = section.id !== activeSection }) }, [activeSection])
+  useEffect(() => { const restore = () => { const requested = new URLSearchParams(window.location.search).get('section'); const fallback = visibleSections[0][0]; setActiveSection(visibleSections.some(([id]) => id === requested) ? requested! : fallback) }; window.addEventListener('popstate', restore); return () => window.removeEventListener('popstate', restore) }, [workspace.role])
 
   const persistMembers = (nextMembers: WorkspaceMember[]) => {
     setMembers(nextMembers)
@@ -299,7 +319,7 @@ export default function SettingsPage({ workspace, storageUsedMb, onOpenApiKeys, 
       <div className="settingsLayout">
         <nav className="settingsNav" aria-label="Settings sections">{visibleSections.map(([id, label]) => <button className={activeSection === id ? 'active' : ''} type="button" key={id} onClick={() => openSection(id)}>{label}</button>)}</nav>
         <label className="settingsMobileNav"><span className="srOnly">Settings section</span><select value={activeSection} onChange={(event) => openSection(event.target.value)}>{visibleSections.map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select><Icon src={icons.chevron} /></label>
-        <div className="settingsContent">
+        <div ref={contentRef} className="settingsContent">
           {workspace.role === 'Viewer' && <div className="workspaceAccessNotice" role="note"><div><strong>View-only workspace</strong><span>You can review {workspace.name} settings, but only an owner or admin can make changes.</span></div><span className="workspaceRoleBadge">Viewer</span></div>}
           <section className="settingsGroup" id="general"><header><h2>General</h2></header>
             <Row label="Workspace name"><div className={`workspaceNameControl${isEditingWorkspaceName ? ' editing' : ''}`}><Icon src={icons.user} />{isEditingWorkspaceName ? <input ref={workspaceNameInputRef} aria-label="Workspace name" aria-invalid={Boolean(workspaceNameError)} value={workspaceNameDraft} maxLength={64} onChange={(event) => { setWorkspaceNameDraft(event.target.value); setWorkspaceNameError('') }} onKeyDown={(event) => { if (event.key === 'Enter') saveWorkspaceName(); else if (event.key === 'Escape') cancelWorkspaceNameEdit() }} /> : <span className="workspaceNameValue">{workspaceName}</span>}{canManage && <button type="button" aria-label={isEditingWorkspaceName ? 'Save workspace name' : 'Edit workspace name'} title={isEditingWorkspaceName ? 'Save' : 'Edit'} onClick={isEditingWorkspaceName ? saveWorkspaceName : startWorkspaceNameEdit}><Icon src={isEditingWorkspaceName ? icons.check : icons.edit} /></button>}{workspaceNameError && <span className="workspaceNameError" role="alert">{workspaceNameError}</span>}</div></Row>
@@ -328,7 +348,7 @@ export default function SettingsPage({ workspace, storageUsedMb, onOpenApiKeys, 
             <Row label="Security alerts" infoText="Security alerts are delivered to the email address on your Beam account."><Toggle label="Security alerts" checked={securityAlerts} onChange={setSecurityAlerts} /></Row>
             <Row label="Alert destination"><span className="settingsStaticValue">michele@example.com</span></Row>
             <Row label="Active sessions"><button className="settingsInlineAction" type="button" onClick={() => setUtilityDialog('sessions')}><Icon src={icons.monitor} />Manage sessions</button></Row>
-            <Row label="Two-factor authentication"><button className="settingsInlineAction" type="button"><Icon src={icons.plus} />Set up</button></Row>
+            <Row label="Two-factor authentication"><button className="settingsInlineAction" type="button" disabled title="Two-factor authentication is coming soon">Coming soon</button></Row>
             <Row label="API keys"><button className="settingsInlineAction" type="button" onClick={onOpenApiKeys}><Icon src={icons.monitor} />Manage API Keys</button></Row>
           </section>}
 
