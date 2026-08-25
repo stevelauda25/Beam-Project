@@ -111,25 +111,20 @@ button { font: inherit; color: inherit; }
   background: linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.2)),#3d3d3d;
   box-shadow: 0 1px 2px -1px rgba(0,0,0,.25),0 2px 4px -2px rgba(0,0,0,.2),0 4px 8px -4px rgba(0,0,0,.15),0 8px 12px -4px rgba(0,0,0,.1),inset 0 .5px .5px rgba(255,255,255,.25),inset 0 -.5px .5px rgba(0,0,0,.1);
   visibility: hidden;
-  clip-path: inset(0 100% 100% 0 round 6px);
   pointer-events: none;
-  transition:
-    clip-path 120ms cubic-bezier(.55, 0, 1, .45),
-    visibility 0s linear 120ms;
-  will-change: clip-path;
 }
 .organizationMenu.open {
   visibility: visible;
-  clip-path: inset(0 0 0 0 round 6px);
   pointer-events: auto;
-  transition:
-    clip-path 200ms cubic-bezier(.16, 1, .3, 1),
-    visibility 0s;
+  transform-origin: top center;
+  animation: organization-menu-expand 320ms cubic-bezier(.22, 1, .36, 1) both;
 }
 .organizationGroup,
 .accountGroup { display: flex; width: 100%; flex-direction: column; }
 .organizationGroup { padding: 0 2px 2px; }
 .accountGroup { padding: 2px; border-top: .5px solid rgba(255,255,255,.12); }
+.organizationMenu.open .organizationGroup,
+.organizationMenu.open .accountGroup { animation: organization-menu-content 180ms ease-out 95ms both; }
 .organizationOption,
 .accountGroup button,
 .organizationLabel { display: flex; width: 100%; height: 22px; align-items: center; gap: 4px; padding: 4px 6px; border: .5px solid transparent; border-radius: 4px; color: #fff; text-align: left; white-space: nowrap; }
@@ -156,8 +151,19 @@ button { font: inherit; color: inherit; }
 }
 .organizationMenu .avatar { width: 12px; height: 12px; flex: 0 0 12px; border-width: .3px; }
 .organizationLabel { color: #c2c2c2; }
+@keyframes organization-menu-expand {
+  0% { opacity: .35; transform: translateY(-5px) scaleY(.08); border-radius: 12px; }
+  58% { opacity: 1; transform: translateY(1px) scaleY(1.025); border-radius: 7px; }
+  100% { opacity: 1; transform: translateY(0) scaleY(1); border-radius: 6px; }
+}
+@keyframes organization-menu-content {
+  0% { opacity: 0; transform: translateY(-5px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
 @media (prefers-reduced-motion: reduce) {
-  .organizationMenu { transition: none; }
+  .organizationMenu.open,
+  .organizationMenu.open .organizationGroup,
+  .organizationMenu.open .accountGroup { animation: none; }
 }
 .iconButton { display: flex; width: 12px; height: 12px; align-items: center; justify-content: center; padding: 0; }
 .collapsedToggleRow { display: flex; height: 26px; align-items: center; padding: 4px 0; }
@@ -308,7 +314,7 @@ button { border: 0; background: transparent; cursor: pointer; }
 .accountPage .accountPageHeader { height: 18px; padding: 0 8px; }
 .accountPage .accountPageHeader h1 { margin: 0; padding: 0; }
 .accountSettingsLayout { display: grid; width: 100%; min-height: 0; grid-template-columns: 168px minmax(0, 1fr) minmax(0, 744px) minmax(0, 1fr) 168px; align-items: start; }
-.accountSectionNav { position: sticky; top: 0; display: flex; width: 168px; grid-column: 1; grid-row: 1; flex-direction: column; gap: 4px; padding-top: 42px; }
+.accountSectionNav { position: sticky; top: 0; display: flex; width: 168px; grid-column: 1; grid-row: 1; flex-direction: column; gap: 4px; padding-top: 48.5px; }
 .accountSectionNav button { width: 100%; height: 22px; padding: 2px 8px; border-radius: 4px; text-align: left; }
 .accountSectionNav button.active { background: #f0f0f0; }
 .accountPageContent { display: flex; width: 100%; min-width: 0; grid-column: 3; grid-row: 1; flex-direction: column; gap: 24px; padding: 42px 0 80px; overflow-y: auto; overscroll-behavior: contain; }
@@ -828,7 +834,7 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 .settingsPageHeader { width: 100%; }
 .settingsPageHeader h1 { margin-bottom: 0; }
 .settingsLayout { display: grid; width: 100%; grid-template-columns: 168px minmax(0, 1fr) minmax(0, 744px) minmax(0, 1fr) 168px; align-items: start; }
-.settingsNav { position: sticky; top: 0; display: flex; grid-column: 1; grid-row: 1; flex-direction: column; gap: 4px; padding-top: 42px; }
+.settingsNav { position: sticky; top: 0; display: flex; grid-column: 1; grid-row: 1; flex-direction: column; gap: 4px; padding-top: 48.5px; }
 .settingsNav button { display: flex; width: 168px; height: 22px; align-items: center; padding: 2px 8px; border-radius: 4px; text-align: left; }
 .settingsNav button.active, .settingsNav button:hover, .settingsNav button:focus-visible { outline: 0; background: #f0f0f0; }
 .settingsMobileNav { display: none; }
@@ -2313,40 +2319,53 @@ button:not(:disabled):active { transform: translateY(.5px); filter: brightness(.
   opacity: 0.82;
 }
 
-/* Canonical opened-menu treatment — Figma 816:36860.
-   Floating menus intentionally use this dark surface in both app themes. */
-@keyframes beam-menu-reveal-top-left {
-  from { clip-path: inset(0 100% 100% 0 round 6px); }
-  to { clip-path: inset(0 0 0 0 round 6px); }
+/* Beam menu motion storyboard:
+   compressed at the trigger -> slight overshoot -> settled at full height. */
+@keyframes context-menu-expand {
+  0% { opacity: .35; transform: translateY(-4px) scaleY(.08); border-radius: 10px; }
+  60% { opacity: 1; transform: translateY(1px) scaleY(1.025); border-radius: 7px; }
+  100% { opacity: 1; transform: translateY(0) scaleY(1); border-radius: 6px; }
 }
 
-@keyframes beam-menu-reveal-top-right {
-  from { clip-path: inset(0 0 100% 100% round 6px); }
-  to { clip-path: inset(0 0 0 0 round 6px); }
+@keyframes context-menu-content {
+  0% { opacity: 0; transform: translateY(-4px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes beam-menu-reveal-bottom-left {
-  from { clip-path: inset(100% 100% 0 0 round 6px); }
-  to { clip-path: inset(0 0 0 0 round 6px); }
+@keyframes account-menu-expand {
+  from { opacity: 0; transform: translateY(5px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-:is(.appearanceSubmenu, .settingsSelectMenu, .apiSelectMenu, .editorHeadingMenu) {
-  animation: beam-menu-reveal-top-left 200ms cubic-bezier(.16, 1, .3, 1) both;
-  will-change: clip-path;
+@keyframes appearance-menu-enter {
+  from { opacity: 0; transform: translateX(-4px) scale(.98); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+:is(.settingsSelectMenu, .apiSelectMenu, .editorHeadingMenu) {
+  transform-origin: top center;
+  animation: context-menu-expand 280ms cubic-bezier(.22, 1, .36, 1) both;
+  will-change: opacity, transform;
 }
 
 :is(.apiRowMenu, .rowMenu) {
-  animation: beam-menu-reveal-top-right 200ms cubic-bezier(.16, 1, .3, 1) both;
-  will-change: clip-path;
+  transform-origin: top right;
+  animation: context-menu-expand 280ms cubic-bezier(.22, 1, .36, 1) both;
+  will-change: opacity, transform;
 }
 
-@keyframes beam-account-menu-enter {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+:is(.settingsSelectMenu, .apiSelectMenu, .apiRowMenu, .rowMenu, .editorHeadingMenu) button {
+  animation: context-menu-content 160ms ease-out 80ms both;
 }
 
 .accountMenu {
-  animation: beam-account-menu-enter 160ms cubic-bezier(.16, 1, .3, 1) both;
+  transform-origin: bottom left;
+  animation: account-menu-expand 240ms cubic-bezier(.22, 1, .36, 1) both;
+  will-change: opacity, transform;
+}
+
+.appearanceSubmenu {
+  animation: appearance-menu-enter 140ms cubic-bezier(.22, 1, .36, 1) both;
   will-change: opacity, transform;
 }
 
@@ -2377,7 +2396,8 @@ button:not(:disabled):active { transform: translateY(.5px); filter: brightness(.
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :is(.accountMenu, .appearanceSubmenu, .settingsSelectMenu, .apiSelectMenu, .apiRowMenu, .rowMenu, .editorHeadingMenu) {
+  :is(.accountMenu, .appearanceSubmenu, .settingsSelectMenu, .apiSelectMenu, .apiRowMenu, .rowMenu, .editorHeadingMenu),
+  :is(.settingsSelectMenu, .apiSelectMenu, .apiRowMenu, .rowMenu, .editorHeadingMenu) button {
     animation: none;
   }
 }
