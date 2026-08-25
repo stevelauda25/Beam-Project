@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 
 type SelectControlProps = {
   value: string
@@ -18,17 +19,34 @@ export default function SelectControl({ value, options, icon, chevronIcon = '/as
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [menuPosition, setMenuPosition] = useState<CSSProperties>({})
   const typeBuffer = useRef('')
   const typeTimer = useRef<number | undefined>(undefined)
 
   useEffect(() => {
     if (!open) return
-    const closeOutside = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) { setOpen(false); triggerRef.current?.focus() } }
+    const closeOutside = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node) && !menuRef.current?.contains(event.target as Node)) setOpen(false) }
     document.addEventListener('mousedown', closeOutside)
     return () => document.removeEventListener('mousedown', closeOutside)
   }, [open])
 
   useEffect(() => { if (open) optionRefs.current[focusedIndex]?.focus() }, [focusedIndex, open])
+
+  useEffect(() => {
+    if (!open) return
+    const positionMenu = () => {
+      const bounds = triggerRef.current?.getBoundingClientRect()
+      if (!bounds) return
+      const menuHeight = options.length * 26 + 4
+      const opensUpward = window.innerHeight - bounds.bottom < menuHeight + 8 && bounds.top > menuHeight + 8
+      setMenuPosition({ position: 'fixed', top: opensUpward ? bounds.top - menuHeight - 4 : bounds.bottom + 4, left: Math.max(8, bounds.right - Math.max(bounds.width, 132)), width: Math.max(bounds.width, 132) })
+    }
+    positionMenu()
+    window.addEventListener('resize', positionMenu)
+    window.addEventListener('scroll', positionMenu, true)
+    return () => { window.removeEventListener('resize', positionMenu); window.removeEventListener('scroll', positionMenu, true) }
+  }, [open, options.length])
 
   const choose = (option: string) => { onChange(option); setOpen(false); requestAnimationFrame(() => triggerRef.current?.focus()) }
   const openAt = (index: number) => { setFocusedIndex(index); setOpen(true) }
@@ -54,6 +72,6 @@ export default function SelectControl({ value, options, icon, chevronIcon = '/as
     <button ref={triggerRef} className="settingsSelectTrigger" type="button" aria-label={`${label}: ${value}`} aria-haspopup="listbox" aria-expanded={open} onClick={() => open ? setOpen(false) : openAt(Math.max(0, options.indexOf(value)))} onKeyDown={handleTriggerKeyDown}>
       {icon && <Icon src={icon} />}<span>{value}</span><Icon src={chevronIcon} />
     </button>
-    {open && <div className="settingsSelectMenu" role="listbox" aria-label={label}>{options.map((option, index) => <button ref={(node) => { optionRefs.current[index] = node }} className={`${option === value ? 'selected ' : ''}${index === focusedIndex ? 'focused' : ''}`} type="button" role="option" aria-selected={option === value} tabIndex={index === focusedIndex ? 0 : -1} key={option} onMouseEnter={() => setFocusedIndex(index)} onKeyDown={(event) => handleOptionKeyDown(event, index)} onClick={() => choose(option)}><span>{option}</span>{option === value && <Icon src="/assets/settings-list.svg" />}</button>)}</div>}
+    {open && createPortal(<div ref={menuRef} className="settingsSelectMenu portaled" style={menuPosition} role="listbox" aria-label={label}>{options.map((option, index) => <button ref={(node) => { optionRefs.current[index] = node }} className={`${option === value ? 'selected ' : ''}${index === focusedIndex ? 'focused' : ''}`} type="button" role="option" aria-selected={option === value} tabIndex={index === focusedIndex ? 0 : -1} key={option} onMouseEnter={() => setFocusedIndex(index)} onKeyDown={(event) => handleOptionKeyDown(event, index)} onClick={() => choose(option)}><span>{option}</span>{option === value && <Icon src="/assets/settings-list.svg" />}</button>)}</div>, document.body)}
   </div>
 }

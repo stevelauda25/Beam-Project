@@ -37,6 +37,16 @@ export default function AccountProfilePage({ displayName, onDisplayNameSave, onP
     if (avatarUrl.startsWith('blob:')) URL.revokeObjectURL(avatarUrl)
     setAvatarUrl(URL.createObjectURL(file)); setAvatarFilename(file.name); setAvatarError('')
   }
+  const cancelPasswordEdit = () => {
+    if (passwordUpdateTimerRef.current !== null) window.clearTimeout(passwordUpdateTimerRef.current)
+    passwordUpdateTimerRef.current = null
+    setEditingPassword(false)
+    setIsUpdatingPassword(false)
+    setCurrentPassword('')
+    setNewPassword('')
+    setConfirmPassword('')
+    setPasswordErrors({})
+  }
   const updatePassword = (event: React.FormEvent) => {
     event.preventDefault()
     if (isUpdatingPassword) return
@@ -49,7 +59,7 @@ export default function AccountProfilePage({ displayName, onDisplayNameSave, onP
     if (errors.next) { newPasswordRef.current?.focus(); return }
     if (errors.confirm) { confirmPasswordRef.current?.focus(); return }
     setIsUpdatingPassword(true)
-    passwordUpdateTimerRef.current = window.setTimeout(() => { setIsUpdatingPassword(false); setEditingPassword(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); onPasswordUpdateSuccess() }, 250)
+    passwordUpdateTimerRef.current = window.setTimeout(() => { passwordUpdateTimerRef.current = null; setIsUpdatingPassword(false); setEditingPassword(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setPasswordErrors({}); onPasswordUpdateSuccess() }, 250)
   }
 
   useEffect(() => {
@@ -66,7 +76,7 @@ export default function AccountProfilePage({ displayName, onDisplayNameSave, onP
   return <main className="accountPage" aria-labelledby="account-title">
     <header className="accountPageHeader"><h1 id="account-title">Account settings</h1></header>
     <div className="accountSettingsLayout">
-      <nav className="accountSectionNav" aria-label="Account settings sections">{accountSections.map(([id, label]) => <button className={activeSection === id ? 'active' : ''} type="button" key={id} onClick={() => openSection(id)}>{label}</button>)}</nav>
+      <nav className="accountSectionNav" aria-label="Account settings sections">{accountSections.map(([id, label]) => <button className={activeSection === id ? 'active' : ''} aria-current={activeSection === id ? 'page' : undefined} type="button" key={id} onClick={() => openSection(id)}>{label}</button>)}</nav>
       <div ref={contentRef} className="accountPageContent">
         <section className="profileGroup" id="account-personal" aria-labelledby="personal-information-title"><header><h2 id="personal-information-title">Personal information</h2></header>
           <div className="profileRow"><div><span>Profile photo</span><small>JPG or PNG, maximum 5 MB</small>{avatarError && <small className="profileFieldError" role="alert">{avatarError}</small>}</div><div className="profilePhotoControl"><img src={avatarUrl} alt={`${displayName} profile`} /><span>{avatarFilename}</span><button type="button" aria-label="Change profile photo" onClick={() => avatarInput.current?.click()}>Change</button><input ref={avatarInput} className="srOnly" type="file" accept="image/png,image/jpeg" onChange={(event) => { selectAvatar(event.target.files?.[0]); event.target.value = '' }} /></div></div>
@@ -75,8 +85,8 @@ export default function AccountProfilePage({ displayName, onDisplayNameSave, onP
         </section>
         <section className="profileGroup" id="account-signin" aria-labelledby="sign-in-methods-title"><header><h2 id="sign-in-methods-title">Sign-in methods</h2></header>
           <div className="profileRow"><div><span className="profileLabelWithStatus">Email <em>Verified</em></span><small>Your primary sign-in and recovery address</small></div><div className="profileEmail"><span>michele@beam.app</span><button className="profileUnavailableAction" type="button" disabled title="Sign-in email changes are not available yet">Coming soon</button></div></div>
-          <div className="profileRow"><div><span>Password</span><small>Last changed July 12, 2026</small></div><button className="profileActionWithIcon" type="button" onClick={() => setEditingPassword((open) => !open)}>{editingPassword ? 'Cancel' : 'Change password'}<img src={icons.edit} alt="" /></button></div>
-          {editingPassword && <form className="profilePasswordForm" onSubmit={updatePassword} noValidate><label>Current password<input ref={currentPasswordRef} type="password" autoComplete="current-password" value={currentPassword} aria-invalid={Boolean(passwordErrors.current)} onChange={(event) => { setCurrentPassword(event.target.value); setPasswordErrors((errors) => ({ ...errors, current: undefined })) }} />{passwordErrors.current && <small role="alert">{passwordErrors.current}</small>}</label><label>New password<input ref={newPasswordRef} type="password" autoComplete="new-password" value={newPassword} aria-invalid={Boolean(passwordErrors.next)} onChange={(event) => { setNewPassword(event.target.value); setPasswordErrors((errors) => ({ ...errors, next: undefined })) }} />{passwordErrors.next && <small role="alert">{passwordErrors.next}</small>}</label><label>Confirm new password<input ref={confirmPasswordRef} type="password" autoComplete="new-password" value={confirmPassword} aria-invalid={Boolean(passwordErrors.confirm)} onChange={(event) => { setConfirmPassword(event.target.value); setPasswordErrors((errors) => ({ ...errors, confirm: undefined })) }} />{passwordErrors.confirm && <small role="alert">{passwordErrors.confirm}</small>}</label><div><button type="button" onClick={() => setEditingPassword(false)}>Cancel</button><button className="primary" type="submit" disabled={isUpdatingPassword} aria-busy={isUpdatingPassword}>{isUpdatingPassword ? 'Updating…' : 'Update password'}</button></div></form>}
+          <div className="profileRow"><div><span>Password</span><small>Last changed July 12, 2026</small></div>{!editingPassword && <button className="profileActionWithIcon" type="button" onClick={() => setEditingPassword(true)}>Change password<img src={icons.edit} alt="" /></button>}</div>
+          {editingPassword && <form className="profilePasswordForm" onSubmit={updatePassword} onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); cancelPasswordEdit() } }} noValidate><label>Current password<input ref={currentPasswordRef} type="password" autoComplete="current-password" value={currentPassword} aria-invalid={Boolean(passwordErrors.current)} onChange={(event) => { setCurrentPassword(event.target.value); setPasswordErrors((errors) => ({ ...errors, current: undefined })) }} />{passwordErrors.current && <small role="alert">{passwordErrors.current}</small>}</label><label>New password<input ref={newPasswordRef} type="password" autoComplete="new-password" value={newPassword} aria-invalid={Boolean(passwordErrors.next)} onChange={(event) => { setNewPassword(event.target.value); setPasswordErrors((errors) => ({ ...errors, next: undefined })) }} />{passwordErrors.next && <small role="alert">{passwordErrors.next}</small>}</label><label>Confirm new password<input ref={confirmPasswordRef} type="password" autoComplete="new-password" value={confirmPassword} aria-invalid={Boolean(passwordErrors.confirm)} onChange={(event) => { setConfirmPassword(event.target.value); setPasswordErrors((errors) => ({ ...errors, confirm: undefined })) }} />{passwordErrors.confirm && <small role="alert">{passwordErrors.confirm}</small>}</label><div><button type="button" onClick={cancelPasswordEdit}>Cancel</button><button className="primary" type="submit" disabled={isUpdatingPassword} aria-busy={isUpdatingPassword}>{isUpdatingPassword ? 'Updating…' : 'Update password'}</button></div></form>}
           <div className="profileRow"><div><span className="profileLabelWithStatus">Google <em>Connected</em></span><small>Connected as michele@gmail.com</small></div><button className="profileUnavailableAction" type="button" disabled title="Google disconnection is not available in this prototype">Coming soon</button></div>
         </section>
         <section className="profileGroup" id="account-protection" aria-labelledby="account-protection-title"><header><h2 id="account-protection-title">Account protection</h2></header>

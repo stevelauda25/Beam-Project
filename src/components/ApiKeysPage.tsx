@@ -1,4 +1,5 @@
-import { FormEvent, KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
+import { CSSProperties, FormEvent, KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 type Permission = 'Admin' | 'Write'
 type ApiKeyStatus = 'active' | 'expiring-soon' | 'expired' | 'revoked'
@@ -84,8 +85,10 @@ const readWorkspaceKeys = (workspaceId: string) => {
 function SelectField({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
   const [isOpen, setIsOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(Math.max(0, options.indexOf(value)))
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>({})
   const fieldRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef({ value: '', timer: 0 })
   const listboxId = useId()
   const optionId = (index: number) => `${listboxId}-option-${index}`
@@ -93,11 +96,36 @@ function SelectField({ label, value, options, onChange }: { label: string; value
   useEffect(() => {
     if (!isOpen) return
     const closeOnOutsideClick = (event: MouseEvent) => {
-      if (!fieldRef.current?.contains(event.target as Node)) { setIsOpen(false); window.requestAnimationFrame(() => triggerRef.current?.focus()) }
+      const target = event.target as Node
+      if (!fieldRef.current?.contains(target) && !menuRef.current?.contains(target)) setIsOpen(false)
     }
     document.addEventListener('mousedown', closeOnOutsideClick)
     return () => document.removeEventListener('mousedown', closeOnOutsideClick)
   }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const positionMenu = () => {
+      const trigger = triggerRef.current
+      if (!trigger) return
+      const rect = trigger.getBoundingClientRect()
+      const viewportGap = 8
+      const menuGap = 4
+      const menuHeight = options.length * 26 + 4
+      const width = Math.max(rect.width, 92)
+      const left = Math.min(Math.max(viewportGap, rect.left), window.innerWidth - width - viewportGap)
+      const fitsBelow = rect.bottom + menuGap + menuHeight <= window.innerHeight - viewportGap
+      const top = fitsBelow ? rect.bottom + menuGap : Math.max(viewportGap, rect.top - menuGap - menuHeight)
+      setMenuStyle({ position: 'fixed', top, left, width })
+    }
+    positionMenu()
+    window.addEventListener('resize', positionMenu)
+    window.addEventListener('scroll', positionMenu, true)
+    return () => {
+      window.removeEventListener('resize', positionMenu)
+      window.removeEventListener('scroll', positionMenu, true)
+    }
+  }, [isOpen, options.length])
 
   useEffect(() => () => window.clearTimeout(searchRef.current.timer), [])
 
@@ -166,20 +194,20 @@ function SelectField({ label, value, options, onChange }: { label: string; value
         <span className={value ? '' : 'placeholder'}>{value || label}</span>
         <img src={apiIcons.chevron} alt="" aria-hidden="true" />
       </button>
-      {isOpen && (
-        <div className="apiSelectMenu" id={listboxId} role="listbox" aria-label={label}>
+      {isOpen && createPortal(
+        <div ref={menuRef} className="apiSelectMenu apiFloatingMenu" style={menuStyle} id={listboxId} role="listbox" aria-label={label}>
           {options.map((option, index) => (
             <button id={optionId(index)} className={`${value === option ? 'selected' : ''}${activeIndex === index ? ' focused' : ''}`} type="button" role="option" aria-selected={value === option} key={option} onMouseEnter={() => setActiveIndex(index)} onClick={() => chooseOption(option)}>
               <span>{option}</span>{value === option && <img src="/assets/download-success.svg" alt="" aria-hidden="true" />}
             </button>
           ))}
-        </div>
+        </div>, document.body
       )}
     </div>
   )
 }
 
-export default function ApiKeysPage({ workspaceId, workspaceName, readOnly = false }: { workspaceId: string; workspaceName: string; readOnly?: boolean }) {
+export default function ApiKeysPage({ workspaceId, readOnly = false }: { workspaceId: string; readOnly?: boolean }) {
   const [keys, setKeys] = useState<ApiKey[]>(() => readWorkspaceKeys(workspaceId))
   const [name, setName] = useState('')
   const [isNameTouched, setIsNameTouched] = useState(false)
@@ -191,6 +219,7 @@ export default function ApiKeysPage({ workspaceId, workspaceName, readOnly = fal
   const [createdCopyFeedback, setCreatedCopyFeedback] = useState<'success' | 'failure' | null>(null)
   const [copiedKeyId, setCopiedKeyId] = useState<number | null>(null)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
+  const [rowMenuStyle, setRowMenuStyle] = useState<CSSProperties>({})
   const [keyToRevoke, setKeyToRevoke] = useState<ApiKey | null>(null)
   const [isRevoking, setIsRevoking] = useState(false)
   const [revokeError, setRevokeError] = useState<string | null>(null)
@@ -202,6 +231,7 @@ export default function ApiKeysPage({ workspaceId, workspaceName, readOnly = fal
   const revokedToastTimerRef = useRef<number | null>(null)
   const copiedKeyTimerRef = useRef<number | null>(null)
   const rowMenuTriggerRefs = useRef(new Map<number, HTMLButtonElement>())
+  const rowMenuRef = useRef<HTMLDivElement>(null)
   const normalizedName = normalizeKeyName(name)
   const nameError = validateKeyName(name, keys)
   const isFormValid = !createdKey && !nameError && Boolean(access && permission && expires)
@@ -225,16 +255,46 @@ export default function ApiKeysPage({ workspaceId, workspaceName, readOnly = fal
       if (restoreFocus) window.requestAnimationFrame(() => trigger?.focus())
     }
     const closeOnOutsideClick = (event: MouseEvent) => {
-      if (!(event.target as HTMLElement).closest('.apiMenuCell')) closeMenu(true)
+      const target = event.target as Node
+      const trigger = rowMenuTriggerRefs.current.get(openMenuId)
+      if (!trigger?.contains(target) && !rowMenuRef.current?.contains(target)) closeMenu(true)
     }
     const handleKeys = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') { event.preventDefault(); closeMenu(true) }
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); document.querySelector<HTMLButtonElement>('.apiRowMenu button')?.focus() }
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); rowMenuRef.current?.querySelector<HTMLButtonElement>('button')?.focus() }
     }
     document.addEventListener('mousedown', closeOnOutsideClick)
     document.addEventListener('keydown', handleKeys)
     return () => { document.removeEventListener('mousedown', closeOnOutsideClick); document.removeEventListener('keydown', handleKeys) }
   }, [openMenuId])
+
+  useEffect(() => {
+    if (openMenuId === null) return
+    const positionMenu = () => {
+      const trigger = rowMenuTriggerRefs.current.get(openMenuId)
+      if (!trigger) return
+      const rect = trigger.getBoundingClientRect()
+      const viewportGap = 8
+      const menuGap = 4
+      const width = 92
+      const menuHeight = 30
+      const left = Math.min(Math.max(viewportGap, rect.right - width), window.innerWidth - width - viewportGap)
+      const fitsBelow = rect.bottom + menuGap + menuHeight <= window.innerHeight - viewportGap
+      const top = fitsBelow ? rect.bottom + menuGap : Math.max(viewportGap, rect.top - menuGap - menuHeight)
+      setRowMenuStyle({ position: 'fixed', top, left, width })
+    }
+    positionMenu()
+    window.addEventListener('resize', positionMenu)
+    window.addEventListener('scroll', positionMenu, true)
+    return () => {
+      window.removeEventListener('resize', positionMenu)
+      window.removeEventListener('scroll', positionMenu, true)
+    }
+  }, [openMenuId])
+
+  const toggleRowMenu = (keyId: number) => {
+    setOpenMenuId((current) => current === keyId ? null : keyId)
+  }
 
   useEffect(() => {
     if (!keyToRevoke) return
@@ -321,8 +381,7 @@ export default function ApiKeysPage({ workspaceId, workspaceName, readOnly = fal
 
   return (
     <section className="apiKeysPage" aria-labelledby="api-keys-title">
-      <h1 id="api-keys-title">API Keys</h1>
-      <p className="apiWorkspaceContext">{workspaceName}{readOnly ? ' · Viewer' : ''}</p>
+      <h1 id="api-keys-title">API keys</h1>
       {readOnly && <div className="apiReadOnlyNotice" role="note">You can review API keys for this workspace, but only an owner or admin can create or revoke them.</div>}
       {!readOnly && <form className="apiKeyForm" onSubmit={createKey}>
         <div className="apiKeyFields">
@@ -380,8 +439,8 @@ export default function ApiKeysPage({ workspaceId, workspaceName, readOnly = fal
               <div role="cell">{key.expiresAt ? formatDate(key.expiresAt) : 'No expiry'}</div>
               <div role="cell"><span className={`apiStatusBadge ${status}`}>{statusLabel[status]}</span></div>
               <div role="cell" className="apiMenuCell">
-                <button ref={(node) => { if (node) rowMenuTriggerRefs.current.set(key.id, node); else rowMenuTriggerRefs.current.delete(key.id) }} type="button" disabled={!canRevoke || readOnly} aria-haspopup="menu" aria-label={readOnly ? `${key.name} is read only` : canRevoke ? `Actions for ${key.name}` : `${key.name} is ${statusLabel[status].toLowerCase()}`} aria-expanded={openMenuId === key.id} onClick={() => setOpenMenuId((current) => current === key.id ? null : key.id)} onKeyDown={(event) => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setOpenMenuId(key.id); window.requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.apiRowMenu button')?.focus()) } }}><img src={apiIcons.more} alt="" /></button>
-                {openMenuId === key.id && <div className="apiRowMenu" role="menu"><button type="button" role="menuitem" onClick={() => { setKeyToRevoke(key); setOpenMenuId(null) }}>Revoke key</button></div>}
+                <button ref={(node) => { if (node) rowMenuTriggerRefs.current.set(key.id, node); else rowMenuTriggerRefs.current.delete(key.id) }} type="button" disabled={!canRevoke || readOnly} aria-haspopup="menu" aria-label={readOnly ? `${key.name} is read only` : canRevoke ? `Actions for ${key.name}` : `${key.name} is ${statusLabel[status].toLowerCase()}`} aria-expanded={openMenuId === key.id} onClick={() => toggleRowMenu(key.id)} onKeyDown={(event) => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setOpenMenuId(key.id); window.requestAnimationFrame(() => rowMenuRef.current?.querySelector<HTMLButtonElement>('button')?.focus()) } }}><img src={apiIcons.more} alt="" /></button>
+                {openMenuId === key.id && createPortal(<div ref={rowMenuRef} className="apiRowMenu apiFloatingMenu" style={rowMenuStyle} role="menu"><button type="button" role="menuitem" onClick={() => { setKeyToRevoke(key); setOpenMenuId(null) }}>Revoke key</button></div>, document.body)}
               </div>
             </div>
             <div className="apiKeyValue" role="row">

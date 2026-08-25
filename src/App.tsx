@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import ApiKeysPage from './components/ApiKeysPage'
 import SettingsPage from './components/SettingsPage'
 import AccountProfilePage from './components/AccountProfilePage'
 import BillingUsagePage from './components/BillingUsagePage'
 import CreateWorkspacePage from './components/CreateWorkspacePage'
 import UploadDemoOverlay from './components/UploadDemoOverlay'
+import WorkspaceAvatar from './components/WorkspaceAvatar'
+import { createStorageId, deleteStoredFile, getStoredFile, storeFile } from './utils/fileStorage'
 
 const icons = {
   personal: '/assets/personal.svg',
@@ -83,9 +86,34 @@ const files: FileRow[] = [
   { name: 'Website Assets', size: '420MB', modified: '6 days ago', kind: 'folder' },
 ]
 
-type FolderFile = { name: string; kind: string; size: string; modified: string; previewAvailable?: boolean }
+type FolderFile = { name: string; kind: string; size: string; modified: string; previewAvailable?: boolean; storageId?: string; mimeType?: string }
 type CopyFeedback = { status: 'success' | 'failure'; fileName: string } | null
 type DownloadFeedback = { status: 'success' | 'failure'; file: FolderFile } | null
+type FolderActivityAction = 'Viewed' | 'Uploaded' | 'Downloaded' | 'Shared' | 'Deleted'
+type FolderActivity = { id: string; action: FolderActivityAction; fileName: string; actor: string; createdAt: number }
+type ShareRole = 'Viewer' | 'Editor'
+type ShareLinkAccess = 'restricted' | 'viewer' | 'editor'
+type ShareMember = { id: string; name: string; email: string; role: ShareRole }
+type FileShareSettings = { members: ShareMember[]; linkAccess: ShareLinkAccess; token: string; demoSeedVersion?: number }
+const demoShareMembers: ShareMember[] = [
+  { id: 'demo-james', name: 'James T.', email: 'james@beam.app', role: 'Editor' },
+  { id: 'demo-aisha', name: 'Aisha R.', email: 'aisha@beam.app', role: 'Viewer' },
+  { id: 'demo-daniel', name: 'Daniel K.', email: 'daniel@beam.app', role: 'Viewer' },
+]
+
+function loadFileShares(storageKey: string): Record<string, FileShareSettings> {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(storageKey) ?? '{}') as Record<string, unknown>
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    return Object.fromEntries(Object.entries(parsed).flatMap(([fileName, value]) => {
+      if (!value || typeof value !== 'object') return []
+      const candidate = value as Partial<FileShareSettings>
+      const members = Array.isArray(candidate.members) ? candidate.members.filter((member): member is ShareMember => Boolean(member && typeof member.id === 'string' && typeof member.name === 'string' && typeof member.email === 'string' && (member.role === 'Viewer' || member.role === 'Editor'))) : []
+      const linkAccess = candidate.linkAccess === 'viewer' || candidate.linkAccess === 'editor' ? candidate.linkAccess : 'restricted'
+      return [[fileName, { members, linkAccess, token: typeof candidate.token === 'string' ? candidate.token : '', demoSeedVersion: typeof candidate.demoSeedVersion === 'number' ? candidate.demoSeedVersion : 0 }]]
+    }))
+  } catch { return {} }
+}
 
 const initialFolderFiles: FolderFile[] = [
   { name: 'backup-prompt.md', kind: 'md', size: '869B', modified: '4 days ago' },
@@ -97,18 +125,19 @@ const initialFolderFiles: FolderFile[] = [
 const initialFolderContents: Record<string, FolderFile[]> = {
   'Folder 001': initialFolderFiles,
   'Product Resources': [
-    { name: 'brand-guidelines.pdf', kind: 'pdf', size: '420MB', modified: '2 days ago' },
-    { name: 'product-images.zip', kind: 'zip', size: '380MB', modified: '3 days ago' },
+    { name: 'brand-guidelines.pdf', kind: 'pdf', size: '42MB', modified: '2 days ago' },
+    { name: 'product-image.png', kind: 'png', size: '38MB', modified: '3 days ago' },
     { name: 'release-notes.md', kind: 'md', size: '56MB', modified: '5 days ago' },
   ],
   'Website Assets': [
-    { name: 'homepage-assets.zip', kind: 'zip', size: '240MB', modified: '1 day ago' },
-    { name: 'campaign-images.zip', kind: 'zip', size: '150MB', modified: '4 days ago' },
-    { name: 'logo-kit.ai', kind: 'ai', size: '30MB', modified: '6 days ago' },
+    { name: 'homepage-hero.webp', kind: 'webp', size: '24MB', modified: '1 day ago' },
+    { name: 'campaign-image.jpg', kind: 'jpg', size: '15MB', modified: '4 days ago' },
+    { name: 'logo-mark.png', kind: 'png', size: '3MB', modified: '6 days ago' },
   ],
 }
 
 type WorkspaceContent = { folders: Folder[]; files: FileRow[]; folderContents: Record<string, FolderFile[]> }
+type MutationNotice = { state: 'saving' | 'success' | 'error'; label: string } | null
 const populatedWorkspaceContent = (): WorkspaceContent => ({
   folders: folders.map((folder) => ({ ...folder })),
   files: files.map((file) => ({ ...file })),
@@ -203,6 +232,9 @@ function Sidebar({ workspaces, activeWorkspace, onWorkspaceChange, onCreateWorks
   const newFolderRowRef = useRef<HTMLDivElement>(null)
   const accountMenuRef = useRef<HTMLDivElement>(null)
   const accountTriggerRef = useRef<HTMLButtonElement>(null)
+  const workspaceMenuRef = useRef<HTMLDivElement>(null)
+  const workspaceTriggerRef = useRef<HTMLButtonElement>(null)
+  const [focusedWorkspaceIndex, setFocusedWorkspaceIndex] = useState(() => Math.max(0, workspaces.findIndex((workspace) => workspace.id === activeWorkspace.id)))
   const folderSuccessTimer = useRef<number | null>(null)
 
   useEffect(() => {
@@ -238,7 +270,11 @@ function Sidebar({ workspaces, activeWorkspace, onWorkspaceChange, onCreateWorks
       if (!(event.target as HTMLElement).closest('[data-org-menu]')) setIsOrgMenuOpen(false)
     }
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsOrgMenuOpen(false)
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setIsOrgMenuOpen(false)
+        workspaceTriggerRef.current?.focus()
+      }
     }
     document.addEventListener('mousedown', closeMenu)
     document.addEventListener('keydown', closeOnEscape)
@@ -247,6 +283,38 @@ function Sidebar({ workspaces, activeWorkspace, onWorkspaceChange, onCreateWorks
       document.removeEventListener('keydown', closeOnEscape)
     }
   }, [isOrgMenuOpen])
+
+  useEffect(() => {
+    const activeIndex = workspaces.findIndex((workspace) => workspace.id === activeWorkspace.id)
+    setFocusedWorkspaceIndex(Math.max(0, activeIndex))
+  }, [activeWorkspace.id, workspaces])
+
+  const focusWorkspaceOption = (index: number) => {
+    const items = Array.from(workspaceMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"], [role="menuitem"]') ?? [])
+    if (!items.length) return
+    const nextIndex = (index + items.length) % items.length
+    setFocusedWorkspaceIndex(nextIndex)
+    items[nextIndex].focus()
+  }
+
+  const handleWorkspaceMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+    event.preventDefault()
+    const itemCount = workspaceMenuRef.current?.querySelectorAll('[role="menuitemradio"], [role="menuitem"]').length ?? 0
+    if (!itemCount) return
+    if (event.key === 'Home') focusWorkspaceOption(0)
+    else if (event.key === 'End') focusWorkspaceOption(itemCount - 1)
+    else focusWorkspaceOption(focusedWorkspaceIndex + (event.key === 'ArrowDown' ? 1 : -1))
+  }
+
+  const handleWorkspaceTriggerKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+    event.preventDefault()
+    setIsAccountMenuOpen(false)
+    setIsOrgMenuOpen(true)
+    const activeIndex = Math.max(0, workspaces.findIndex((workspace) => workspace.id === activeWorkspace.id))
+    requestAnimationFrame(() => focusWorkspaceOption(event.key === 'ArrowUp' ? workspaces.length : activeIndex))
+  }
 
   useEffect(() => {
     if (!isAccountMenuOpen) return
@@ -305,14 +373,14 @@ function Sidebar({ workspaces, activeWorkspace, onWorkspaceChange, onCreateWorks
       <div className="sidebarTop">
           <div className="workspaceRow">
             <div className="organizationControl" data-org-menu>
-              <button className="workspaceName" onClick={() => { setIsAccountMenuOpen(false); setIsOrgMenuOpen((open) => !open) }} aria-haspopup="menu" aria-expanded={isOrgMenuOpen}>
+              <button ref={workspaceTriggerRef} className="workspaceName" onClick={() => { setIsAccountMenuOpen(false); setFocusedWorkspaceIndex(Math.max(0, workspaces.findIndex((workspace) => workspace.id === activeWorkspace.id))); setIsOrgMenuOpen((open) => !open) }} onKeyDown={handleWorkspaceTriggerKeyDown} aria-haspopup="menu" aria-expanded={isOrgMenuOpen}>
                 {activeWorkspace.id === 'personal' ? <Icon src={icons.personal} /> : <span className="organizationAvatar"><Icon src={activeWorkspace.icon} /></span>}
                 <span>{activeWorkspace.name}</span>
                 <span className={`organizationChevron${isOrgMenuOpen ? ' open' : ''}`}><Icon src={icons.chevron} /></span>
               </button>
-              <div className={`organizationMenu${isOrgMenuOpen ? ' open' : ''}`} role="menu" aria-label="Organizations" aria-hidden={!isOrgMenuOpen}>
+              <div ref={workspaceMenuRef} className={`organizationMenu${isOrgMenuOpen ? ' open' : ''}`} role="menu" aria-label="Organizations" aria-hidden={!isOrgMenuOpen} onKeyDown={handleWorkspaceMenuKeyDown}>
                   <div className="organizationGroup">
-                    {workspaces.map((workspace) => {
+                    {workspaces.map((workspace, index) => {
                       const isActive = workspace.id === activeWorkspace.id
                       return (
                         <button
@@ -320,8 +388,9 @@ function Sidebar({ workspaces, activeWorkspace, onWorkspaceChange, onCreateWorks
                           type="button"
                           role="menuitemradio"
                           aria-checked={isActive}
-                          tabIndex={isOrgMenuOpen ? 0 : -1}
+                          tabIndex={isOrgMenuOpen && focusedWorkspaceIndex === index ? 0 : -1}
                           key={workspace.id}
+                          onFocus={() => setFocusedWorkspaceIndex(index)}
                           onClick={() => { onWorkspaceChange(workspace.id); setIsOrgMenuOpen(false) }}
                         >
                           {workspace.id === 'personal' ? <img className="avatar" src="/assets/workspace-menu-personal.png" alt="" /> : <span className="organizationAvatar"><img className="icon" src={workspace.id === 'company-xyz' ? '/assets/workspace-menu-xyz.svg' : '/assets/workspace-menu-abc.svg'} alt="" aria-hidden="true" /></span>}
@@ -332,7 +401,7 @@ function Sidebar({ workspaces, activeWorkspace, onWorkspaceChange, onCreateWorks
                     })}
                   </div>
                   <div className="accountGroup">
-                    <button className="workspaceAddAction" type="button" tabIndex={isOrgMenuOpen ? 0 : -1} onClick={() => { setIsOrgMenuOpen(false); onCreateWorkspace() }}><img src="/assets/workspace-menu-add.svg" alt="" aria-hidden="true" />Add new workspace</button>
+                    <button className="workspaceAddAction" type="button" role="menuitem" tabIndex={isOrgMenuOpen && focusedWorkspaceIndex === workspaces.length ? 0 : -1} onFocus={() => setFocusedWorkspaceIndex(workspaces.length)} onClick={() => { setIsOrgMenuOpen(false); onCreateWorkspace() }}><img src="/assets/workspace-menu-add.svg" alt="" aria-hidden="true" />Add new workspace</button>
                   </div>
                 </div>
             </div>
@@ -352,13 +421,22 @@ function Sidebar({ workspaces, activeWorkspace, onWorkspaceChange, onCreateWorks
                 placeholder="Search all files"
                 aria-label="Search all files"
                 onFocus={onStartSearch}
-                onChange={(event) => onSearchChange(event.target.value)}
+                onChange={(event) => {
+                  if (event.target.value.trim()) closeFolderEntry()
+                  onSearchChange(event.target.value)
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Escape' || !isSearching) return
+                  event.preventDefault()
+                  event.stopPropagation()
+                  onSearchChange('')
+                }}
               />
               {isSearching ? (
                 <button type="button" className="clearSearch" aria-label="Clear search" onClick={() => onSearchChange('')}><Icon src={icons.searchClear} /></button>
-              ) : <Icon src={icons.shortcut} />}
+              ) : null}
             </label>
-          <button className="plainButton" aria-label={canEditWorkspace ? 'New folder' : 'New folder unavailable with Viewer access'} title={isCollapsed ? 'New folder' : undefined} disabled={isNewFolderOpen || !canEditWorkspace} onClick={() => { setIsOrgMenuOpen(false); setIsAccountMenuOpen(false); if (isCollapsed) onStartSearch(); setIsNewFolderOpen(true) }}>
+          <button className="plainButton" aria-label={canEditWorkspace ? 'New folder' : 'New folder unavailable with Viewer access'} title={isCollapsed ? 'New folder' : undefined} disabled={isNewFolderOpen || !canEditWorkspace} onClick={() => { setIsOrgMenuOpen(false); setIsAccountMenuOpen(false); if (isCollapsed) onStartSearch(); if (isSearching) onSearchChange(''); setIsNewFolderOpen(true) }}>
             <Icon src={icons.folder} /><span className="sidebarLabel">New folder</span>
           </button>
         </div>
@@ -375,7 +453,7 @@ function Sidebar({ workspaces, activeWorkspace, onWorkspaceChange, onCreateWorks
 
       <div className="sidebarBottom">
         <div className="utilityLinks">
-          <button className={`plainButton${isApiKeysActive ? ' active' : ''}`} aria-label="API Keys" title={isCollapsed ? 'API Keys' : undefined} onClick={onOpenApiKeys}><Icon src={icons.key} /><span className="sidebarLabel">API Keys</span></button>
+          <button className={`plainButton${isApiKeysActive ? ' active' : ''}`} aria-label="API keys" title={isCollapsed ? 'API keys' : undefined} onClick={onOpenApiKeys}><Icon src={icons.key} /><span className="sidebarLabel">API keys</span></button>
           <button className={`plainButton${isSettingsActive ? ' active' : ''}`} aria-label="Settings" title={isCollapsed ? 'Settings' : undefined} onClick={onOpenSettings}><Icon src={icons.settings} /><span className="sidebarLabel">Settings</span></button>
         </div>
         <div className="accountControl" data-account-menu>
@@ -516,6 +594,7 @@ function DeleteItemModal({ itemName, itemType, retention = '30 days', onConfirm,
 
 function FileTable({ rows = files, showHeader = true, onOpenFolder, onOpenFile, onRenameFolder, onDeleteFolder }: { rows?: FileRow[]; showHeader?: boolean; onOpenFolder?: (name: string) => void; onOpenFile?: (file: FileRow) => void; onRenameFolder?: (name: string) => void; onDeleteFolder?: (name: string) => void }) {
   const [openMenu, setOpenMenu] = useState<string | null>(null)
+  const openRow = (file: FileRow) => file.kind === 'folder' ? onOpenFolder?.(file.name) : onOpenFile?.(file)
 
   useEffect(() => {
     if (!openMenu) return
@@ -539,7 +618,14 @@ function FileTable({ rows = files, showHeader = true, onOpenFolder, onOpenFile, 
     <div className="fileTable">
       {showHeader && <div className="tableRow tableHead"><div>Name</div><div>Size</div><div>Modified</div><div /></div>}
       {rows.map((file, index) => (
-        <div className={`tableRow${!showHeader && index === 0 ? ' first' : ''}${index === rows.length - 1 ? ' last' : ''}`} key={file.path ?? file.name}>
+        <div
+          className={`tableRow clickable${!showHeader && index === 0 ? ' first' : ''}${index === rows.length - 1 ? ' last' : ''}`}
+          key={file.path ?? file.name}
+          tabIndex={0}
+          aria-label={`Open ${file.name}`}
+          onClick={(event) => { if (!(event.target as HTMLElement).closest('button')) openRow(file) }}
+          onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); openRow(file) } }}
+        >
           <div className="fileName">
             {file.kind === 'folder' && onOpenFolder ? <button className="fileLink" onClick={() => onOpenFolder(file.name)}>{file.name}</button> : file.kind === 'file' && onOpenFile ? <button className="fileLink searchFileLink" onClick={() => onOpenFile(file)}><span>{file.name}</span>{file.path && <small>{file.path}</small>}</button> : <span>{file.name}</span>}
             {file.badge && <span className="badge">{file.badge}</span>}
@@ -589,7 +675,21 @@ function formatDisplayFileSize(size: string) {
   return size.replace(/\s*(B|KB|MB|GB)$/i, ' $1')
 }
 
-function FolderDetail({ folderName, initialItems, initialSelectedFileName, onItemsChange, onBack, readOnly = false, defaultView = 'list', confirmDelete = true, trashRetention = '30 days' }: { folderName: string; initialItems: FolderFile[]; initialSelectedFileName?: string | null; onItemsChange: (items: FolderFile[]) => void; onBack: () => void; readOnly?: boolean; defaultView?: 'list' | 'grid'; confirmDelete?: boolean; trashRetention?: string }) {
+const supportedUploadExtensions = ['md', 'txt', 'pdf', 'jpg', 'jpeg', 'png', 'webp', 'gif'] as const
+const supportedUploadAccept = supportedUploadExtensions.map((extension) => `.${extension}`).join(',')
+const supportedUploadLabel = 'MD, TXT, PDF, JPG, JPEG, PNG, WEBP, or GIF'
+const isSupportedUpload = (file: File) => supportedUploadExtensions.some((extension) => file.name.toLocaleLowerCase().endsWith(`.${extension}`))
+const unsupportedUploadMessage = (files: File[]) => {
+  const unsupportedNames = files.filter((file) => !isSupportedUpload(file)).map((file) => file.name)
+  if (!unsupportedNames.length) return null
+  const names = unsupportedNames.length > 2 ? `${unsupportedNames.slice(0, 2).join(', ')} and ${unsupportedNames.length - 2} more` : unsupportedNames.join(', ')
+  return `${names} can’t be uploaded. Supported formats: ${supportedUploadLabel}.`
+}
+
+function FolderDetail({ workspaceId = window.localStorage.getItem('beam-active-workspace') || 'personal', accountName, folderName, initialItems, initialSelectedFileName, onItemsChange, onBack, readOnly = false, defaultView = 'list', confirmDelete = true, trashRetention = '30 days' }: { workspaceId?: string; accountName: string; folderName: string; initialItems: FolderFile[]; initialSelectedFileName?: string | null; onItemsChange: (items: FolderFile[], removedFile?: FolderFile) => void; onBack: () => void; readOnly?: boolean; defaultView?: 'list' | 'grid'; confirmDelete?: boolean; trashRetention?: string }) {
+  const uploadRecoveryKey = `beam-pending-upload-v1-${workspaceId}-${folderName}`
+  const activityStorageKey = `beam-folder-activity-v1-${workspaceId}-${folderName}`
+  const shareStorageKey = `beam-file-sharing-v1-${workspaceId}-${folderName}`
   const [folderItems, setFolderItems] = useState<FolderFile[]>(initialItems)
   const [selectedFile, setSelectedFile] = useState<FolderFile | null>(() => {
     const requested = initialSelectedFileName ?? new URLSearchParams(window.location.search).get('file') ?? window.sessionStorage.getItem('beam-open-file')
@@ -602,33 +702,85 @@ function FolderDetail({ folderName, initialItems, initialSelectedFileName, onIte
   const [copyFeedback, setCopyFeedback] = useState<CopyFeedback>(null)
   const [downloadFeedback, setDownloadFeedback] = useState<DownloadFeedback>(null)
   const [openFileMenu, setOpenFileMenu] = useState<number | null>(null)
+  const [gridContextMenuPosition, setGridContextMenuPosition] = useState<{ left: number; top: number } | null>(null)
   const [fileToDelete, setFileToDelete] = useState<{ file: FolderFile; index: number } | null>(null)
   const [isDraggingFiles, setIsDraggingFiles] = useState(false)
   const [pendingUpload, setPendingUpload] = useState<File[] | null>(null)
+  const [uploadNotice, setUploadNotice] = useState<string | null>(() => window.sessionStorage.getItem(uploadRecoveryKey) ? 'The previous upload was interrupted. Select the same files again to retry.' : null)
   const [viewMode, setViewMode] = useState<'list' | 'grid'>(defaultView)
   const [splitPercent, setSplitPercent] = useState(50)
   const [isResizing, setIsResizing] = useState(false)
+  const [activity, setActivity] = useState<FolderActivity[]>(() => {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(activityStorageKey) ?? '[]') as unknown
+      if (!Array.isArray(parsed)) return []
+      return parsed.filter((item): item is FolderActivity => Boolean(item && typeof item === 'object' && typeof (item as FolderActivity).id === 'string' && typeof (item as FolderActivity).fileName === 'string' && typeof (item as FolderActivity).actor === 'string' && typeof (item as FolderActivity).createdAt === 'number' && ['Viewed', 'Uploaded', 'Downloaded', 'Shared', 'Deleted'].includes((item as FolderActivity).action)))
+    } catch { return [] }
+  })
+  const [fileShares, setFileShares] = useState<Record<string, FileShareSettings>>(() => loadFileShares(shareStorageKey))
 
   useEffect(() => setViewMode(defaultView), [defaultView])
 
+  useEffect(() => {
+    const showOfflineNotice = () => setUploadNotice('You’re offline. Reconnect before uploading files.')
+    window.addEventListener('offline', showOfflineNotice)
+    return () => window.removeEventListener('offline', showOfflineNotice)
+  }, [])
+
+  const recordActivity = (action: FolderActivityAction, fileName: string) => {
+    setActivity((current) => {
+      const next = [{ id: `${Date.now()}-${crypto.randomUUID?.() ?? Math.random()}`, action, fileName, actor: accountName, createdAt: Date.now() }, ...current].slice(0, 50)
+      try { window.localStorage.setItem(activityStorageKey, JSON.stringify(next)) } catch { /* Activity still updates for this session if storage is unavailable. */ }
+      return next
+    })
+  }
+
+  const updateFileShare = (fileName: string, update: (current: FileShareSettings) => FileShareSettings) => {
+    setFileShares((current) => {
+      const nextSettings = update(current[fileName] ?? { members: [], linkAccess: 'restricted', token: '' })
+      const next = { ...current, [fileName]: nextSettings }
+      try { window.localStorage.setItem(shareStorageKey, JSON.stringify(next)) } catch { /* Keep sharing usable for this session. */ }
+      return next
+    })
+  }
+
+  const recordedInitialPreviewRef = useRef(false)
+  useEffect(() => {
+    if (recordedInitialPreviewRef.current || !initialSelectedFileName || !selectedFile) return
+    recordedInitialPreviewRef.current = true
+    recordActivity('Viewed', selectedFile.name)
+  }, [initialSelectedFileName, selectedFile])
+
+  useEffect(() => {
+    if (!selectedFile || fileShares[selectedFile.name]?.demoSeedVersion === 1) return
+    updateFileShare(selectedFile.name, (current) => ({ ...current, members: [...current.members, ...demoShareMembers.filter((demo) => !current.members.some((member) => member.id === demo.id))], demoSeedVersion: 1 }))
+  }, [selectedFile?.name])
+
   const removeFile = (file: FolderFile, index: number) => {
-    setFolderItems((items) => { const next = items.filter((_, itemIndex) => itemIndex !== index); onItemsChange(next); return next })
+    setFolderItems((items) => { const next = items.filter((_, itemIndex) => itemIndex !== index); onItemsChange(next, file); return next })
     if (selectedFile === file) setSelectedFile(null)
+    recordActivity('Deleted', file.name)
   }
   const previewLayoutRef = useRef<HTMLDivElement>(null)
   const previewOriginRef = useRef<HTMLElement | null>(null)
+  const previewOriginIndexRef = useRef<number | null>(null)
+  const gridContextOriginRef = useRef<HTMLButtonElement | null>(null)
   const isResizingRef = useRef(false)
   const dragDepthRef = useRef(0)
   const copyFeedbackTimerRef = useRef<number | null>(null)
   const downloadFeedbackTimerRef = useRef<number | null>(null)
+  const uploadAbortRef = useRef<AbortController | null>(null)
   const minimumDetailWidth = 350
   const minimumPreviewWidth = 513
-  const openPreview = (file: FolderFile, origin: HTMLElement, keyboard: boolean) => { previewOriginRef.current = origin; setFocusPreviewOnOpen(keyboard); setSelectedFile(file) }
+  const openPreview = (file: FolderFile, origin: HTMLElement, keyboard: boolean, trackView = true) => { previewOriginRef.current = origin; previewOriginIndexRef.current = folderItems.indexOf(file); setFocusPreviewOnOpen(keyboard); setSelectedFile(file); if (trackView) recordActivity('Viewed', file.name) }
   const closePreview = (restoreFocus = false) => {
     setSelectedFile(null)
     setShareFileName(null)
     if (restoreFocus) window.requestAnimationFrame(() => {
-      if (previewOriginRef.current?.isConnected) previewOriginRef.current.focus()
+      const restoredOrigin = previewOriginIndexRef.current === null ? null : document.querySelector<HTMLElement>(`[data-file-open-index="${previewOriginIndexRef.current}"]`)
+      const restoredFileButton = restoredOrigin instanceof HTMLButtonElement ? restoredOrigin : restoredOrigin?.querySelector<HTMLButtonElement>('.fileGridOpen')
+      if (restoredFileButton) restoredFileButton.focus()
+      else if (previewOriginRef.current?.isConnected) previewOriginRef.current.focus()
       else document.querySelector<HTMLElement>('.detailTable, .fileGrid')?.focus()
     })
   }
@@ -640,6 +792,7 @@ function FolderDetail({ folderName, initialItems, initialSelectedFileName, onIte
   }
 
   useEffect(() => () => {
+    uploadAbortRef.current?.abort()
     if (copyFeedbackTimerRef.current !== null) window.clearTimeout(copyFeedbackTimerRef.current)
     if (downloadFeedbackTimerRef.current !== null) window.clearTimeout(downloadFeedbackTimerRef.current)
   }, [])
@@ -647,12 +800,13 @@ function FolderDetail({ folderName, initialItems, initialSelectedFileName, onIte
   useEffect(() => {
     if (openFileMenu === null) return
     const closeMenu = (event: MouseEvent) => {
-      if (!(event.target as HTMLElement).closest('[data-detail-row-menu]')) setOpenFileMenu(null)
+      if (!(event.target as HTMLElement).closest('[data-detail-row-menu]')) { setOpenFileMenu(null); setGridContextMenuPosition(null) }
     }
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         const index = openFileMenu
         setOpenFileMenu(null)
+        setGridContextMenuPosition(null)
         window.requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-file-menu-index="${index}"]`)?.focus())
       }
     }
@@ -663,6 +817,17 @@ function FolderDetail({ folderName, initialItems, initialSelectedFileName, onIte
       document.removeEventListener('keydown', closeOnEscape)
     }
   }, [openFileMenu])
+
+  useEffect(() => { setOpenFileMenu(null); setGridContextMenuPosition(null) }, [viewMode])
+
+  const openGridContextMenu = (index: number, origin: HTMLButtonElement, clientX: number, clientY: number) => {
+    const menuWidth = 140
+    const menuHeight = readOnly ? 84 : 110
+    gridContextOriginRef.current = origin
+    setOpenFileMenu(index)
+    setGridContextMenuPosition({ left: Math.max(8, Math.min(clientX, window.innerWidth - menuWidth - 8)), top: Math.max(8, Math.min(clientY, window.innerHeight - menuHeight - 8)) })
+    window.requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('[data-grid-context-menu] [role="menuitem"]')?.focus())
+  }
 
   const handleFileMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
@@ -676,32 +841,69 @@ function FolderDetail({ folderName, initialItems, initialSelectedFileName, onIte
     event.preventDefault(); items[next]?.focus()
   }
 
-  const commitFiles = (incomingFiles: FileList | File[]) => {
+  const commitFiles = async (incomingFiles: FileList | File[]) => {
     if (readOnly) return
-    const addedFiles = Array.from(incomingFiles).map((file) => ({
-      name: file.name,
+    const incoming = Array.from(incomingFiles)
+    const unsupportedMessage = unsupportedUploadMessage(incoming)
+    if (unsupportedMessage) throw new Error(unsupportedMessage)
+    if (incoming.some((file) => file.size === 0)) throw new Error('Empty files cannot be uploaded.')
+    if (incoming.some((file) => file.size > 100 * 1024 * 1024)) throw new Error('Files must be 100 MB or smaller.')
+    const usedNames = new Set(folderItems.map((item) => item.name.toLocaleLowerCase()))
+    const uniqueName = (name: string) => {
+      const dot = name.lastIndexOf('.'); const stem = dot > 0 ? name.slice(0, dot) : name; const extension = dot > 0 ? name.slice(dot) : ''
+      let candidate = name; let suffix = 2
+      while (usedNames.has(candidate.toLocaleLowerCase())) candidate = `${stem} (${suffix++})${extension}`
+      usedNames.add(candidate.toLocaleLowerCase()); return candidate
+    }
+    const records = incoming.map((file) => ({ file, name: uniqueName(file.name), storageId: createStorageId(workspaceId, folderName) }))
+    const controller = new AbortController()
+    uploadAbortRef.current = controller
+    try {
+      await Promise.all(records.map(({ file, name, storageId }) => storeFile({ id: storageId, workspaceId, folderName, name, type: file.type, size: file.size, lastModified: file.lastModified, blob: file }, controller.signal)))
+    } catch (error) {
+      await Promise.allSettled(records.map(({ storageId }) => deleteStoredFile(storageId)))
+      throw error
+    } finally {
+      if (uploadAbortRef.current === controller) uploadAbortRef.current = null
+    }
+    const addedFiles = records.map(({ file, name, storageId }) => ({
+      name,
       kind: file.name.includes('.') ? file.name.split('.').pop()!.toLowerCase() : 'file',
       size: formatFileSize(file.size),
       modified: 'Just now',
-      previewAvailable: false,
+      previewAvailable: true,
+      storageId,
+      mimeType: file.type,
     }))
     if (addedFiles.length) setFolderItems((current) => {
       const next = [...current, ...addedFiles]
       onItemsChange(next)
       return next
     })
+    addedFiles.forEach((file) => recordActivity('Uploaded', file.name))
+    return true
   }
 
   const queueFiles = (incomingFiles: FileList | File[]) => {
     if (readOnly) return
     const files = Array.from(incomingFiles)
-    if (files.length) setPendingUpload(files)
+    if (!files.length) return
+    if (pendingUpload) { setUploadNotice('An upload is already in progress. Wait for it to finish before adding more files.'); return }
+    if (!navigator.onLine) { setUploadNotice('You’re offline. Reconnect before uploading files.'); return }
+    const unsupportedMessage = unsupportedUploadMessage(files)
+    if (unsupportedMessage) { setUploadNotice(unsupportedMessage); return }
+    if (files.some((file) => file.size === 0)) { setUploadNotice('Empty files cannot be uploaded. Choose a file containing data.'); return }
+    if (files.some((file) => file.size > 100 * 1024 * 1024)) { setUploadNotice('Files must be 100 MB or smaller.'); return }
+    window.sessionStorage.setItem(uploadRecoveryKey, JSON.stringify(files.map((file) => ({ name: file.name, size: file.size, lastModified: file.lastModified }))))
+    setUploadNotice(null)
+    setPendingUpload(files)
   }
 
-  const downloadFile = (file: FolderFile) => {
+  const downloadFile = async (file: FolderFile) => {
     try {
-      if (file.previewAvailable === false) throw new Error('File unavailable')
-      const blob = new Blob([`# ${file.name}\n`], { type: 'text/markdown' })
+      const stored = file.storageId ? await getStoredFile(file.storageId) : undefined
+      if (file.storageId && !stored) throw new Error('File unavailable')
+      const blob = stored?.blob ?? new Blob([`# ${file.name}\n`], { type: 'text/markdown' })
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
@@ -709,6 +911,7 @@ function FolderDetail({ folderName, initialItems, initialSelectedFileName, onIte
       link.click()
       window.setTimeout(() => URL.revokeObjectURL(url), 0)
       setDownloadFeedback({ status: 'success', file })
+      recordActivity('Downloaded', file.name)
       if (downloadFeedbackTimerRef.current !== null) window.clearTimeout(downloadFeedbackTimerRef.current)
       downloadFeedbackTimerRef.current = window.setTimeout(() => setDownloadFeedback(null), 3000)
     } catch {
@@ -720,8 +923,14 @@ function FolderDetail({ folderName, initialItems, initialSelectedFileName, onIte
   const copyFileLink = async (file: FolderFile) => {
     try {
       if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable')
-      await navigator.clipboard.writeText(`${window.location.origin}/${folderName}/${file.name}`)
+      const currentSettings = fileShares[file.name] ?? { members: [], linkAccess: 'restricted', token: '' }
+      const token = currentSettings.token || crypto.randomUUID()
+      if (!currentSettings.token) updateFileShare(file.name, (current) => ({ ...current, token }))
+      const shareUrl = new URL(window.location.origin)
+      shareUrl.searchParams.set('share', token)
+      await navigator.clipboard.writeText(shareUrl.toString())
       setCopyFeedback({ status: 'success', fileName: file.name })
+      recordActivity('Shared', file.name)
     } catch {
       setCopyFeedback({ status: 'failure', fileName: file.name })
     }
@@ -765,7 +974,7 @@ function FolderDetail({ folderName, initialItems, initialSelectedFileName, onIte
       window.removeEventListener('dragleave', handleDragLeave)
       window.removeEventListener('drop', handleDrop)
     }
-  }, [readOnly])
+  }, [pendingUpload, readOnly])
 
   const updateSplitFromPointer = (clientX: number) => {
     const bounds = previewLayoutRef.current?.getBoundingClientRect()
@@ -810,7 +1019,7 @@ function FolderDetail({ folderName, initialItems, initialSelectedFileName, onIte
         <button onClick={onBack}>My Beam</button><span>/</span><span>{folderName}</span>
       </nav>
       {!readOnly && <div className="uploadActions">
-        <label className="uploadButton"><Icon src={icons.upload} /><span>Upload file</span><input type="file" multiple onChange={(event) => { if (event.target.files) queueFiles(event.target.files); event.target.value = '' }} /></label>
+        <label className="uploadButton"><Icon src={icons.upload} /><span>Upload file</span><input type="file" accept={supportedUploadAccept} multiple onChange={(event) => { if (event.target.files) queueFiles(event.target.files); event.target.value = '' }} /></label>
         <span>or drag and drop</span>
       </div>}
     </div>
@@ -825,7 +1034,7 @@ function FolderDetail({ folderName, initialItems, initialSelectedFileName, onIte
           key={`${file.name}-${index}`}
           role="row"
         >
-          <div role="cell"><button className="fileNameButton" type="button" title={file.name} onClick={(event) => openPreview(file, event.currentTarget, event.detail === 0)}>{file.name}</button></div><div role="cell">{file.kind}</div><div role="cell">{file.size}</div><div role="cell">{file.modified}</div>
+          <div role="cell"><button data-file-open-index={index} className="fileNameButton" type="button" title={file.name} onClick={(event) => openPreview(file, event.currentTarget, event.detail === 0)}>{file.name}</button></div><div role="cell">{file.kind}</div><div role="cell">{file.size}</div><div role="cell">{file.modified}</div>
           <div role="cell" className="detailMore" data-detail-row-menu>
             <button
               data-file-menu-index={index}
@@ -834,7 +1043,7 @@ function FolderDetail({ folderName, initialItems, initialSelectedFileName, onIte
               aria-label={`Actions for ${file.name}`}
               aria-haspopup="menu"
               aria-expanded={openFileMenu === index}
-              onClick={() => setOpenFileMenu((current) => current === index ? null : index)}
+              onClick={() => { setGridContextMenuPosition(null); setOpenFileMenu((current) => current === index ? null : index) }}
               onKeyDown={(event) => { if (event.key === 'ArrowDown') { event.preventDefault(); setOpenFileMenu(index); window.requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-menu-for="${index}"] [role="menuitem"]`)?.focus()) } }}
             ><Icon src={icons.more} /></button>
             {openFileMenu === index && (
@@ -855,13 +1064,20 @@ function FolderDetail({ folderName, initialItems, initialSelectedFileName, onIte
     <div className="fileGrid" role="list" tabIndex={-1} aria-label={`${folderName} files`}>
       {folderItems.map((file, index) => (
         <article
-          className={`fileGridCard${selectedFile?.name === file.name ? ' selected' : ''}`}
+          data-file-open-index={index}
+          className={`fileGridCard${selectedFile?.name === file.name || (gridContextMenuPosition && openFileMenu === index) ? ' selected' : ''}`}
           role="listitem"
           key={`${file.name}-${index}`}
         >
-          <button className="fileGridOpen" type="button" title={file.name} aria-label={`Open ${file.name}`} onClick={(event) => openPreview(file, event.currentTarget, event.detail === 0)}><span className="fileGridPreview"><Icon src={icons.fileDocument} /></span><span className="fileGridName">{file.name}</span></button>
+          <button data-file-menu-index={index} className="fileGridOpen" type="button" title={file.name} aria-label={`Open ${file.name}`} aria-haspopup="menu" aria-expanded={Boolean(gridContextMenuPosition && openFileMenu === index)} onClick={(event) => openPreview(file, event.currentTarget, event.detail === 0)} onContextMenu={(event) => { event.preventDefault(); openGridContextMenu(index, event.currentTarget, event.clientX, event.clientY) }} onKeyDown={(event) => { if ((event.shiftKey && event.key === 'F10') || event.key === 'ContextMenu') { event.preventDefault(); const bounds = event.currentTarget.getBoundingClientRect(); openGridContextMenu(index, event.currentTarget, bounds.left + bounds.width / 2, bounds.top + bounds.height / 2) } }}><span className="fileGridPreview"><Icon src={icons.fileDocument} /></span><span className="fileGridName">{file.name}</span></button>
         </article>
       ))}
+      {gridContextMenuPosition && openFileMenu !== null && folderItems[openFileMenu] && (() => { const file = folderItems[openFileMenu]; const index = openFileMenu; return <div data-detail-row-menu data-grid-context-menu className="rowMenu detailRowMenu gridContextMenu" style={gridContextMenuPosition} role="menu" aria-label={`Actions for ${file.name}`} onKeyDown={handleFileMenuKeyDown}>
+        <button className="darkIcon" type="button" role="menuitem" onClick={() => { setInfoFile(file); setOpenFileMenu(null); setGridContextMenuPosition(null) }}><Icon src={icons.previewInfo} />Info</button>
+        <button className="darkIcon" type="button" role="menuitem" onClick={() => { const origin = gridContextOriginRef.current; setShareFileName(file.name); setOpenFileMenu(null); setGridContextMenuPosition(null); if (origin) openPreview(file, origin, true, false) }}><Icon src={icons.previewShare} />Share</button>
+        <button className="darkIcon" type="button" role="menuitem" onClick={() => { void downloadFile(file); setOpenFileMenu(null); setGridContextMenuPosition(null) }}><Icon src={icons.previewDownload} />Download</button>
+        {!readOnly && <button type="button" role="menuitem" onClick={() => { if (confirmDelete) setFileToDelete({ file, index }); else removeFile(file, index); setOpenFileMenu(null); setGridContextMenuPosition(null) }}><Icon src={icons.actionDelete} />Delete</button>}
+      </div> })()}
     </div>
   )
 
@@ -877,7 +1093,7 @@ function FolderDetail({ folderName, initialItems, initialSelectedFileName, onIte
       {selectedFile ? (
         <div className={`previewLayout${isResizing ? ' resizing' : ''}`} ref={previewLayoutRef}>
           <div className="detailMain" style={{ flexBasis: `${splitPercent}%` }}>{detailHeader}{viewMode === 'grid' ? detailGridView : detailTable}</div>
-          <FilePreview file={selectedFile} focusOnOpen={focusPreviewOnOpen} openShareInitially={shareFileName === selectedFile.name} copyFeedback={copyFeedback?.fileName === selectedFile.name ? copyFeedback : null} onCopyLink={() => copyFileLink(selectedFile)} onDownload={() => downloadFile(selectedFile)} onInfo={() => setInfoFile(selectedFile)} onClose={closePreview} />
+          <FilePreview file={selectedFile} accountName={accountName} shareSettings={fileShares[selectedFile.name] ?? { members: [], linkAccess: 'restricted', token: '' }} focusOnOpen={focusPreviewOnOpen} openShareInitially={shareFileName === selectedFile.name} copyFeedback={copyFeedback?.fileName === selectedFile.name ? copyFeedback : null} onCopyLink={() => copyFileLink(selectedFile)} onMemberRoleChange={(memberId, role) => { updateFileShare(selectedFile.name, (current) => ({ ...current, members: current.members.map((member) => member.id === memberId ? { ...member, role } : member) })); recordActivity('Shared', selectedFile.name) }} onRemoveMember={(memberId) => { updateFileShare(selectedFile.name, (current) => ({ ...current, members: current.members.filter((member) => member.id !== memberId) })); recordActivity('Shared', selectedFile.name) }} onLinkAccessChange={(linkAccess) => { updateFileShare(selectedFile.name, (current) => ({ ...current, linkAccess })); recordActivity('Shared', selectedFile.name) }} onDownload={() => downloadFile(selectedFile)} onInfo={() => setInfoFile(selectedFile)} onClose={closePreview} />
           <div
             className="paneHandle"
             style={{ left: `${splitPercent}%` }}
@@ -913,10 +1129,10 @@ function FolderDetail({ folderName, initialItems, initialSelectedFileName, onIte
               <h2 id="detail-empty-title">No files yet</h2>
               <p>This folder is empty. Upload a file to get started.</p>
             </div>
-            {!readOnly && <label className="detailEmptyUpload"><Icon src={icons.upload} /><span>Upload file</span><input type="file" multiple onChange={(event) => { if (event.target.files) queueFiles(event.target.files); event.target.value = '' }} /></label>}
+            {!readOnly && <label className="detailEmptyUpload"><Icon src={icons.upload} /><span>Upload file</span><input type="file" accept={supportedUploadAccept} multiple onChange={(event) => { if (event.target.files) queueFiles(event.target.files); event.target.value = '' }} /></label>}
           </section>
         </>
-      ) : <>{detailHeader}<div className="detailGrid"><div className="detailListPane">{viewMode === 'grid' ? detailGridView : detailTable}<div className="viewTabsDock">{viewTabs}</div></div><RecentActivity /></div></>}
+      ) : <>{detailHeader}<div className="detailGrid"><div className="detailListPane">{viewMode === 'grid' ? detailGridView : detailTable}<div className="viewTabsDock">{copyFeedback && <CopyTooltip feedback={copyFeedback} global />}{viewTabs}</div></div><RecentActivity activity={activity} folderName={folderName} /></div></>}
       {isDraggingFiles && (
         <div className="dropOverlay" role="status" aria-live="polite">
           <div className="dropZone">
@@ -927,21 +1143,21 @@ function FolderDetail({ folderName, initialItems, initialSelectedFileName, onIte
         </div>
       )}
       {infoFile && <FileActivityModal file={infoFile} onClose={() => setInfoFile(null)} />}
-      {copyFeedback && !selectedFile && <CopyTooltip feedback={copyFeedback} global />}
       {downloadFeedback && <DownloadToast feedback={downloadFeedback} onRetry={() => downloadFile(downloadFeedback.file)} onClose={() => setDownloadFeedback(null)} />}
+      {uploadNotice && <div className="downloadToast failure uploadRecoveryToast" role="alert" aria-live="polite"><Icon src={icons.previewClose} /><div className="downloadToastText"><strong>{!navigator.onLine ? 'You’re offline' : uploadNotice.startsWith('An upload is already') ? 'Upload already in progress' : 'Upload interrupted'}</strong><span>{uploadNotice}</span></div><button className="downloadToastClose" type="button" onClick={() => { setUploadNotice(null); window.sessionStorage.removeItem(uploadRecoveryKey) }} aria-label="Dismiss upload notice" /></div>}
       {fileToDelete && <DeleteItemModal itemName={fileToDelete.file.name} itemType="file" retention={trashRetention} onClose={() => setFileToDelete(null)} onConfirm={() => { removeFile(fileToDelete.file, fileToDelete.index); setFileToDelete(null) }} />}
       {pendingUpload && <UploadDemoOverlay
         files={pendingUpload.map((file) => ({
           name: file.name,
           size: formatDisplayFileSize(formatFileSize(file.size)),
-          weight: file.size,
+          bytes: file.size,
           icon: /\.(?:jpe?g|png|gif|webp)$/i.test(file.name)
             ? '/assets/upload-image-file.svg'
             : /\.pdf$/i.test(file.name) ? '/assets/drop-file-type.svg' : '/assets/upload-file.svg',
         }))}
         autoCloseOnComplete
-        onClose={() => setPendingUpload(null)}
-        onComplete={() => commitFiles(pendingUpload)}
+        onClose={() => { uploadAbortRef.current?.abort(); setPendingUpload(null); window.sessionStorage.removeItem(uploadRecoveryKey) }}
+        onComplete={async () => { const saved = await commitFiles(pendingUpload); if (saved) window.sessionStorage.removeItem(uploadRecoveryKey); return saved }}
       />}
     </div>
   )
@@ -1016,6 +1232,7 @@ function DownloadToast({ feedback, onRetry, onClose }: { feedback: NonNullable<D
 }
 
 type EditorToolbarPosition = { left: number; top: number }
+type EditorPanelPosition = { left: number; top: number; width: number; placement: 'above' | 'below' }
 
 const editorIcons = {
   chevron: '/assets/editor-chevron.svg', bold: '/assets/editor-bold.svg', italic: '/assets/editor-italic.svg',
@@ -1026,8 +1243,11 @@ const editorIcons = {
 function TextEditorToolbar({ position, blockStyle, isBulleted, onFormat }: { position: EditorToolbarPosition; blockStyle: 'Header 1' | 'Body'; isBulleted: boolean; onFormat: (command: string, value?: string) => void }) {
   const [openEditorPanel, setOpenEditorPanel] = useState<'heading' | 'color' | 'link' | null>(null)
   const [linkUrl, setLinkUrl] = useState('')
+  const [linkError, setLinkError] = useState('')
   const [nextAlignment, setNextAlignment] = useState<'center' | 'right' | 'left'>('center')
+  const [panelPosition, setPanelPosition] = useState<EditorPanelPosition>({ left: 8, top: 8, width: 98, placement: 'below' })
   const toolbarRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLElement>(null)
   const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const closePanel = (restoreFocus = false) => {
     const panel = openEditorPanel
@@ -1036,12 +1256,38 @@ function TextEditorToolbar({ position, blockStyle, isBulleted, onFormat }: { pos
   }
   useEffect(() => {
     if (!openEditorPanel) return
-    const onPointerDown = (event: MouseEvent) => { if (!toolbarRef.current?.contains(event.target as Node)) closePanel() }
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (!toolbarRef.current?.contains(target) && !panelRef.current?.contains(target)) closePanel()
+    }
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); closePanel(true) } }
     document.addEventListener('mousedown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
     return () => { document.removeEventListener('mousedown', onPointerDown); document.removeEventListener('keydown', onKeyDown) }
   }, [openEditorPanel])
+  useEffect(() => {
+    if (!openEditorPanel) return
+    const positionPanel = () => {
+      const trigger = triggerRefs.current[openEditorPanel]
+      if (!trigger) return
+      const rect = trigger.getBoundingClientRect()
+      const viewportGap = 8
+      const panelGap = 4
+      const dimensions = openEditorPanel === 'heading' ? { width: 98, height: 56 } : openEditorPanel === 'color' ? { width: 108, height: 30 } : { width: 244, height: linkError ? 54 : 34 }
+      const preferredLeft = openEditorPanel === 'link' ? rect.right - dimensions.width : rect.left
+      const left = Math.min(Math.max(viewportGap, preferredLeft), window.innerWidth - dimensions.width - viewportGap)
+      const fitsBelow = rect.bottom + panelGap + dimensions.height <= window.innerHeight - viewportGap
+      const top = fitsBelow ? rect.bottom + panelGap : Math.max(viewportGap, rect.top - panelGap - dimensions.height)
+      setPanelPosition({ left, top, width: dimensions.width, placement: fitsBelow ? 'below' : 'above' })
+    }
+    positionPanel()
+    window.addEventListener('resize', positionPanel)
+    window.addEventListener('scroll', positionPanel, true)
+    return () => {
+      window.removeEventListener('resize', positionPanel)
+      window.removeEventListener('scroll', positionPanel, true)
+    }
+  }, [linkError, openEditorPanel])
   const menuKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
     const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'))
     const current = items.indexOf(document.activeElement as HTMLButtonElement)
@@ -1055,13 +1301,28 @@ function TextEditorToolbar({ position, blockStyle, isBulleted, onFormat }: { pos
   }
   const applyBlockStyle = (style: 'Header 1' | 'Body') => {
     closePanel(true)
-    onFormat('formatBlock', style === 'Header 1' ? 'h1' : 'p')
+    onFormat('inlineTextStyle', style)
   }
   const applyLink = () => {
-    const normalizedUrl = linkUrl.trim()
-    if (!normalizedUrl) return
+    const input = linkUrl.trim()
+    if (!input) return
+    const candidate = /^[a-z][a-z\d+.-]*:/i.test(input) ? input : `https://${input}`
+    let normalizedUrl = ''
+    try {
+      const parsedUrl = new URL(candidate)
+      const domainPattern = /^(?:[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?\.)+[a-z]{2,63}$/i
+      const isValidIp = /^(?:\d{1,3}\.){3}\d{1,3}$/.test(parsedUrl.hostname)
+        && parsedUrl.hostname.split('.').every((part) => Number(part) <= 255)
+      const hasValidHost = domainPattern.test(parsedUrl.hostname) || parsedUrl.hostname === 'localhost' || isValidIp
+      if (!['http:', 'https:'].includes(parsedUrl.protocol) || !hasValidHost) throw new Error('Unsupported URL')
+      normalizedUrl = parsedUrl.href
+    } catch {
+      setLinkError('Enter a valid web address')
+      return
+    }
     onFormat('createLink', normalizedUrl)
     setLinkUrl('')
+    setLinkError('')
     setOpenEditorPanel(null)
   }
   const insertImage = (file: File | undefined) => {
@@ -1083,17 +1344,17 @@ function TextEditorToolbar({ position, blockStyle, isBulleted, onFormat }: { pos
     <div ref={toolbarRef} className="textEditorToolbar" style={position} role="toolbar" aria-label="Text formatting" onMouseDown={(event) => event.stopPropagation()} onContextMenu={(event) => event.preventDefault()}>
       <div className="editorGroup editorHeadingGroup">
         <button ref={(node) => { triggerRefs.current.heading = node }} className="editorHeadingTrigger" type="button" aria-haspopup="menu" aria-expanded={openEditorPanel === 'heading'} onMouseDown={(event) => event.preventDefault()} onClick={() => setOpenEditorPanel((panel) => panel === 'heading' ? null : 'heading')}><span>{blockStyle}</span><img className={openEditorPanel === 'heading' ? 'open' : ''} src={editorIcons.chevron} alt="" /></button>
-        {openEditorPanel === 'heading' && (
-          <div className="editorHeadingMenu" role="menu" aria-label="Text style" onKeyDown={menuKeyDown}>
+        {openEditorPanel === 'heading' && createPortal(
+          <div ref={(node) => { panelRef.current = node }} className="editorHeadingMenu editorFloatingPanel" style={{ left: panelPosition.left, top: panelPosition.top, width: panelPosition.width }} data-placement={panelPosition.placement} role="menu" aria-label="Text style" onKeyDown={menuKeyDown}>
             <button className={blockStyle === 'Header 1' ? 'selected' : ''} type="button" role="menuitemradio" aria-checked={blockStyle === 'Header 1'} onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockStyle('Header 1')}><span>Header 1</span>{blockStyle === 'Header 1' && <img src={icons.downloadSuccess} alt="" />}</button>
             <button className={blockStyle === 'Body' ? 'selected' : ''} type="button" role="menuitemradio" aria-checked={blockStyle === 'Body'} onMouseDown={(event) => event.preventDefault()} onClick={() => applyBlockStyle('Body')}><span>Body</span>{blockStyle === 'Body' && <img src={icons.downloadSuccess} alt="" />}</button>
-          </div>
+          </div>, document.body
         )}
       </div>
       <div className="editorGroup editorFormattingGroup">
-        {iconButton('Bold', editorIcons.bold, 'bold', 'editorHoverPreview')}
-        {iconButton('Italic', editorIcons.italic, 'italic')}
-        {iconButton('Underline', editorIcons.underline, 'underline')}
+        {iconButton('Bold', editorIcons.bold, 'inlineBold', 'editorHoverPreview')}
+        {iconButton('Italic', editorIcons.italic, 'inlineItalic')}
+        {iconButton('Underline', editorIcons.underline, 'inlineUnderline')}
         <img className="editorDivider" src={editorIcons.divider} alt="" />
         <button ref={(node) => { triggerRefs.current.color = node }} className="editorColor" type="button" aria-haspopup="menu" aria-label="Text color" aria-expanded={openEditorPanel === 'color'} title="Text color" onMouseDown={(event) => event.preventDefault()} onClick={() => setOpenEditorPanel((panel) => panel === 'color' ? null : 'color')}><span /></button>
         <img className="editorDivider" src={editorIcons.divider} alt="" />
@@ -1102,16 +1363,37 @@ function TextEditorToolbar({ position, blockStyle, isBulleted, onFormat }: { pos
         <img className="editorDivider" src={editorIcons.divider} alt="" />
         <button ref={(node) => { triggerRefs.current.link = node }} type="button" aria-haspopup="dialog" aria-label="Add link" aria-expanded={openEditorPanel === 'link'} title="Add link" onMouseDown={(event) => event.preventDefault()} onClick={() => setOpenEditorPanel((panel) => panel === 'link' ? null : 'link')}><img src={editorIcons.link} alt="" /></button>
         <label className="editorImageButton" title="Add image"><img src={editorIcons.image} alt="" /><input type="file" accept="image/*" onChange={(event) => { insertImage(event.target.files?.[0]); event.target.value = '' }} /></label>
-        {openEditorPanel === 'color' && <div className="editorColorMenu" role="menu" aria-label="Text colors" onKeyDown={menuKeyDown}>{['#0a0a0a', '#29323d', '#0d76f2', '#f24b0d', '#810718'].map((color) => <button type="button" role="menuitem" key={color} aria-label={`Use ${color}`} style={{ backgroundColor: color }} onMouseDown={(event) => event.preventDefault()} onClick={() => { onFormat('foreColor', color); closePanel(true) }} />)}</div>}
-        {openEditorPanel === 'link' && <form className="editorLinkMenu" role="dialog" aria-label="Add link" onSubmit={(event) => { event.preventDefault(); applyLink() }}><input autoFocus value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} placeholder="https://example.com" aria-label="Link URL" /><button type="submit" disabled={!linkUrl.trim()}>Apply</button></form>}
+        {openEditorPanel === 'color' && createPortal(<div ref={(node) => { panelRef.current = node }} className="editorColorMenu editorFloatingPanel" style={{ left: panelPosition.left, top: panelPosition.top, width: panelPosition.width }} data-placement={panelPosition.placement} role="menu" aria-label="Text colors" onKeyDown={menuKeyDown}>{['#0a0a0a', '#29323d', '#0d76f2', '#f24b0d', '#810718'].map((color) => <button type="button" role="menuitem" key={color} aria-label={`Use ${color}`} style={{ backgroundColor: color }} onMouseDown={(event) => event.preventDefault()} onClick={() => { onFormat('foreColor', color); closePanel(true) }} />)}</div>, document.body)}
+        {openEditorPanel === 'link' && createPortal(<form ref={(node) => { panelRef.current = node }} className="editorLinkMenu editorFloatingPanel" style={{ left: panelPosition.left, top: panelPosition.top, width: panelPosition.width }} data-placement={panelPosition.placement} role="dialog" aria-label="Add link" onSubmit={(event) => { event.preventDefault(); applyLink() }}><div className="editorLinkFields"><div><input autoFocus value={linkUrl} onChange={(event) => { setLinkUrl(event.target.value); setLinkError('') }} placeholder="https://example.com" aria-label="Link URL" aria-invalid={Boolean(linkError)} aria-describedby={linkError ? 'editor-link-error' : undefined} /><button type="submit" disabled={!linkUrl.trim()}>Apply</button></div>{linkError && <span id="editor-link-error" role="alert">{linkError}</span>}</div></form>, document.body)}
       </div>
     </div>
   )
 }
 
-function FilePreview({ file, focusOnOpen = false, openShareInitially = false, copyFeedback, onCopyLink, onDownload, onInfo, onClose }: { file: FolderFile; focusOnOpen?: boolean; openShareInitially?: boolean; copyFeedback: CopyFeedback; onCopyLink: () => void; onDownload: () => void; onInfo: () => void; onClose: (restoreFocus?: boolean) => void }) {
-  const [loadState, setLoadState] = useState<'loaded' | 'loading' | 'error'>(file.previewAvailable === false ? 'error' : 'loaded')
+function ShareRoleControl({ member, onChange }: { member: ShareMember; onChange: (role: ShareRole) => void }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const controlRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!isOpen) return
+    const close = (event: MouseEvent) => { if (!controlRef.current?.contains(event.target as Node)) setIsOpen(false) }
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.stopPropagation(); setIsOpen(false) } }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', closeOnEscape) }
+  }, [isOpen])
+  return <div className="shareMemberRoleControl" ref={controlRef}>
+    <button type="button" aria-haspopup="listbox" aria-expanded={isOpen} onClick={() => setIsOpen((open) => !open)}>{member.role}<img src="/assets/share-extra-1.svg" alt="" aria-hidden="true" /></button>
+    {isOpen && <div className="shareMemberRoleMenu" role="listbox" aria-label={`Role for ${member.email}`}>{(['Viewer', 'Editor'] as const).map((role) => <button type="button" role="option" aria-selected={member.role === role} key={role} onClick={() => { onChange(role); setIsOpen(false) }}><span>{role}</span>{member.role === role && <img src="/assets/workspace-menu-check.svg" alt="" aria-hidden="true" />}</button>)}</div>}
+  </div>
+}
+
+function FilePreview({ file, accountName, shareSettings, focusOnOpen = false, openShareInitially = false, copyFeedback, onCopyLink, onMemberRoleChange, onRemoveMember, onLinkAccessChange, onDownload, onInfo, onClose }: { file: FolderFile; accountName: string; shareSettings: FileShareSettings; focusOnOpen?: boolean; openShareInitially?: boolean; copyFeedback: CopyFeedback; onCopyLink: () => void; onMemberRoleChange: (memberId: string, role: ShareRole) => void; onRemoveMember: (memberId: string) => void; onLinkAccessChange: (access: ShareLinkAccess) => void; onDownload: () => void; onInfo: () => void; onClose: (restoreFocus?: boolean) => void }) {
+  const [loadState, setLoadState] = useState<'loaded' | 'loading' | 'unsupported' | 'error'>(file.storageId ? 'loading' : file.previewAvailable === false ? 'error' : 'loaded')
+  const [storedPreview, setStoredPreview] = useState<{ kind: 'text'; content: string } | { kind: 'url'; url: string; mimeType: string } | null>(null)
   const [isShareOpen, setIsShareOpen] = useState(openShareInitially)
+  const [isLinkAccessOpen, setIsLinkAccessOpen] = useState(false)
+  const [memberPendingRemoval, setMemberPendingRemoval] = useState<string | null>(null)
+  const [accessToast, setAccessToast] = useState('')
   const [editorToolbarPosition, setEditorToolbarPosition] = useState<EditorToolbarPosition | null>(null)
   const [editorBlockStyle, setEditorBlockStyle] = useState<'Header 1' | 'Body'>('Body')
   const [isEditorBulleted, setIsEditorBulleted] = useState(false)
@@ -1120,20 +1402,43 @@ function FilePreview({ file, focusOnOpen = false, openShareInitially = false, co
   const editorSelectionRef = useRef<Range | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const shareTriggerRef = useRef<HTMLButtonElement>(null)
+  const removeAccessCancelRef = useRef<HTMLButtonElement>(null)
+  const accessToastTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
-    setLoadState(file.previewAvailable === false ? 'error' : 'loaded')
+    let disposed = false
+    let objectUrl = ''
+    const load = async () => {
+      if (!file.storageId) { setLoadState(file.previewAvailable === false ? 'error' : 'loaded'); setStoredPreview(null); return }
+      setLoadState('loading')
+      try {
+        const stored = await getStoredFile(file.storageId)
+        if (!stored) throw new Error('Missing stored file')
+        const mime = stored.type || file.mimeType || ''
+        if (mime.startsWith('text/') || /\.(md|txt|json|csv|html|css|js|ts)$/i.test(file.name)) {
+          const content = await stored.blob.text()
+          if (!disposed) { setStoredPreview({ kind: 'text', content }); setLoadState('loaded') }
+        } else if (mime.startsWith('image/') || mime === 'application/pdf' || /\.(png|jpe?g|gif|webp|svg|pdf)$/i.test(file.name)) {
+          objectUrl = URL.createObjectURL(stored.blob)
+          if (!disposed) { setStoredPreview({ kind: 'url', url: objectUrl, mimeType: mime }); setLoadState('loaded') }
+        } else if (!disposed) { setStoredPreview(null); setLoadState('unsupported') }
+      } catch { if (!disposed) setLoadState('error') }
+    }
+    void load()
     setIsShareOpen(openShareInitially)
     if (focusOnOpen) window.requestAnimationFrame(() => closeButtonRef.current?.focus({ preventScroll: true }))
     return () => {
+      disposed = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
       if (retryTimerRef.current !== null) window.clearTimeout(retryTimerRef.current)
+      if (accessToastTimerRef.current !== null) window.clearTimeout(accessToastTimerRef.current)
     }
   }, [file, focusOnOpen, openShareInitially])
 
   useEffect(() => {
     const closeEditor = (event: MouseEvent) => {
       const target = event.target as HTMLElement
-      if (!target.closest('.textEditorToolbar') && !target.closest('.previewDocument')) setEditorToolbarPosition(null)
+      if (!target.closest('.textEditorToolbar') && !target.closest('.editorFloatingPanel') && !target.closest('.previewDocument')) setEditorToolbarPosition(null)
     }
     document.addEventListener('mousedown', closeEditor)
     return () => document.removeEventListener('mousedown', closeEditor)
@@ -1142,7 +1447,9 @@ function FilePreview({ file, focusOnOpen = false, openShareInitially = false, co
   useEffect(() => {
     if (!isShareOpen) return
     const closeShare = (event: MouseEvent) => {
-      if (!(event.target as HTMLElement).closest('[data-share-control]')) { setIsShareOpen(false); window.requestAnimationFrame(() => shareTriggerRef.current?.focus()) }
+      const target = event.target as HTMLElement
+      if (!target.closest('.sharePermissionControl')) setIsLinkAccessOpen(false)
+      if (!target.closest('[data-share-control]')) { setIsShareOpen(false); window.requestAnimationFrame(() => shareTriggerRef.current?.focus()) }
     }
     document.addEventListener('mousedown', closeShare)
     return () => {
@@ -1150,17 +1457,21 @@ function FilePreview({ file, focusOnOpen = false, openShareInitially = false, co
     }
   }, [isShareOpen])
 
+  useEffect(() => { if (memberPendingRemoval) window.requestAnimationFrame(() => removeAccessCancelRef.current?.focus()) }, [memberPendingRemoval])
+
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       event.preventDefault()
       if (editorToolbarPosition) setEditorToolbarPosition(null)
+      else if (memberPendingRemoval) setMemberPendingRemoval(null)
+      else if (isLinkAccessOpen) setIsLinkAccessOpen(false)
       else if (isShareOpen) { setIsShareOpen(false); window.requestAnimationFrame(() => shareTriggerRef.current?.focus()) }
-      else onClose(true)
+      else onClose(focusOnOpen)
     }
     document.addEventListener('keydown', closeOnEscape)
     return () => document.removeEventListener('keydown', closeOnEscape)
-  }, [editorToolbarPosition, isShareOpen, onClose])
+  }, [editorToolbarPosition, focusOnOpen, isLinkAccessOpen, isShareOpen, memberPendingRemoval, onClose])
 
   const retryLoading = () => {
     setLoadState('loading')
@@ -1195,8 +1506,76 @@ function FilePreview({ file, focusOnOpen = false, openShareInitially = false, co
     previewDocumentRef.current?.focus({ preventScroll: true })
     selection.removeAllRanges()
     selection.addRange(savedRange)
-    document.execCommand(command, false, value)
-    if (command === 'formatBlock') setEditorBlockStyle(value === 'h1' ? 'Header 1' : 'Body')
+    const wrapSelection = (styles: Partial<CSSStyleDeclaration>, format?: string) => {
+      const wrapper = document.createElement('span')
+      if (format) wrapper.dataset.editorFormat = format
+      Object.assign(wrapper.style, styles)
+      wrapper.append(savedRange.extractContents())
+      savedRange.insertNode(wrapper)
+      const nextSelection = document.createRange()
+      nextSelection.selectNodeContents(wrapper)
+      selection.removeAllRanges()
+      selection.addRange(nextSelection)
+      editorSelectionRef.current = nextSelection.cloneRange()
+    }
+    if (command === 'inlineTextStyle') {
+      const wrapper = document.createElement('span')
+      if (value === 'Header 1') {
+        wrapper.style.fontSize = '16px'
+        wrapper.style.lineHeight = '16px'
+        wrapper.style.fontWeight = '500'
+      } else {
+        wrapper.style.fontSize = '12px'
+        wrapper.style.lineHeight = '1.4'
+        wrapper.style.fontWeight = '400'
+      }
+      wrapper.append(savedRange.extractContents())
+      savedRange.insertNode(wrapper)
+      const nextSelection = document.createRange()
+      nextSelection.selectNodeContents(wrapper)
+      selection.removeAllRanges()
+      selection.addRange(nextSelection)
+      editorSelectionRef.current = nextSelection.cloneRange()
+      setEditorBlockStyle(value === 'Header 1' ? 'Header 1' : 'Body')
+    } else if (command === 'inlineBold' || command === 'inlineItalic' || command === 'inlineUnderline') {
+      const format = command.replace('inline', '').toLowerCase()
+      const selectionElement = savedRange.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+        ? savedRange.commonAncestorContainer as Element
+        : savedRange.commonAncestorContainer.parentElement
+      const semanticSelector = format === 'bold' ? 'strong, b' : format === 'italic' ? 'i, em' : 'u'
+      const isAlreadyFormatted = Boolean(selectionElement?.closest(`[data-editor-format="${format}"], ${semanticSelector}`))
+      const styles = format === 'bold'
+        ? { fontWeight: isAlreadyFormatted ? '400' : '500' }
+        : format === 'italic'
+          ? { fontStyle: isAlreadyFormatted ? 'normal' : 'italic' }
+          : { textDecoration: isAlreadyFormatted ? 'none' : 'underline' }
+      wrapSelection(styles, format)
+    } else if (command === 'foreColor' && value) {
+      wrapSelection({ color: value }, 'color')
+    } else if (command === 'createLink' && value) {
+      const link = document.createElement('a')
+      link.href = value
+      link.rel = 'noopener noreferrer'
+      link.append(savedRange.extractContents())
+      savedRange.insertNode(link)
+      const nextSelection = document.createRange()
+      nextSelection.selectNodeContents(link)
+      selection.removeAllRanges()
+      selection.addRange(nextSelection)
+      editorSelectionRef.current = nextSelection.cloneRange()
+    } else if (command === 'insertImage' && value) {
+      const image = document.createElement('img')
+      image.src = value
+      image.alt = ''
+      savedRange.deleteContents()
+      savedRange.insertNode(image)
+      const nextSelection = document.createRange()
+      nextSelection.setStartAfter(image)
+      nextSelection.collapse(true)
+      selection.removeAllRanges()
+      selection.addRange(nextSelection)
+      editorSelectionRef.current = nextSelection.cloneRange()
+    } else document.execCommand(command, false, value)
     setIsEditorBulleted(document.queryCommandState('insertUnorderedList'))
     if (selection.rangeCount) {
       const nextRange = selection.getRangeAt(0)
@@ -1209,7 +1588,10 @@ function FilePreview({ file, focusOnOpen = false, openShareInitially = false, co
     }
   }
 
+  const memberToRemove = shareSettings.members.find((member) => member.id === memberPendingRemoval) ?? null
+
   return (
+    <>
     <aside className="filePreview" aria-label={`Preview of ${file.name}`}>
       <div className="previewTitle"><span>{file.name}</span><button ref={closeButtonRef} type="button" onClick={(event) => onClose(event.detail === 0)}><Icon src={icons.previewClose} />Close</button></div>
       <div className="previewCard">
@@ -1228,15 +1610,24 @@ function FilePreview({ file, focusOnOpen = false, openShareInitially = false, co
                     <div className="sharePeople">
                       <div className="shareHeadingRow">
                         <div className="shareHeading"><span>People with access to</span><img src="/assets/share-document.svg" alt="" aria-hidden="true" /><span>{file.name}</span></div>
-                        <div className="sharePeopleCount" aria-label="1 person has access"><img src="/assets/share-people.svg" alt="" aria-hidden="true" /><span>1</span></div>
+                        <div className="sharePeopleCount" aria-label={`${shareSettings.members.length + 1} people have access`}><img src="/assets/share-people.svg" alt="" aria-hidden="true" /><span>{shareSettings.members.length + 1}</span></div>
                       </div>
                       <div className="shareMemberRow">
-                        <div className="shareMember"><img className="shareAvatar" src="/assets/james-avatar.png" alt="" /><span>James T.</span><span className="shareBadge">Member</span></div>
-                        <button type="button" disabled>Remove</button>
+                        <div className="shareMember"><img className="shareAvatar" src="/assets/account-menu-avatar.png" alt="" /><span>{accountName}</span><span className="shareBadge">You</span></div>
+                        <span className="shareOwnerRole">Owner</span>
                       </div>
+                      {shareSettings.members.map((member, index) => <div className="shareMemberRow" key={member.id}>
+                        <div className="shareMember"><WorkspaceAvatar name={member.name} email={member.email} variant={index + 1} /><span title={member.email}>{member.name}</span><ShareRoleControl member={member} onChange={(role) => onMemberRoleChange(member.id, role)} /></div>
+                        <button type="button" onClick={() => { setMemberPendingRemoval(member.id); setIsShareOpen(false) }}>Remove</button>
+                      </div>)}
                     </div>
                     <div className="shareFooter">
-                      <button className="sharePermission" type="button" disabled aria-disabled="true" title="Permission is inherited from workspace access">All people with access can edit<img src="/assets/share-extra-1.svg" alt="" /></button>
+                      <div className="sharePermissionControl">
+                        <button className="sharePermission" type="button" aria-haspopup="listbox" aria-expanded={isLinkAccessOpen} onClick={() => setIsLinkAccessOpen((open) => !open)}>{shareSettings.linkAccess === 'restricted' ? 'Restricted' : shareSettings.linkAccess === 'viewer' ? 'Anyone with link · Viewer' : 'Anyone with link · Editor'}<img src="/assets/share-extra-1.svg" alt="" aria-hidden="true" /></button>
+                        {isLinkAccessOpen && <div className="sharePermissionMenu" role="listbox" aria-label="Link access">
+                          {([['restricted', 'Restricted'], ['viewer', 'Anyone with link · Viewer'], ['editor', 'Anyone with link · Editor']] as const).map(([value, label]) => <button type="button" role="option" aria-selected={shareSettings.linkAccess === value} key={value} onClick={() => { onLinkAccessChange(value); setIsLinkAccessOpen(false) }}><span>{label}</span>{shareSettings.linkAccess === value && <img src="/assets/workspace-menu-check.svg" alt="" aria-hidden="true" />}</button>)}
+                        </div>}
+                      </div>
                       <button className="shareCopyLink" type="button" onClick={onCopyLink}><img src={copyFeedback?.status === 'success' ? icons.downloadSuccess : copyFeedback?.status === 'failure' ? icons.previewClose : '/assets/share-chevron.svg'} alt="" />{copyFeedback?.status === 'success' ? 'Link copied' : copyFeedback?.status === 'failure' ? 'Copy failed' : 'Copy link'}</button>
                     </div>
                   </div>
@@ -1246,12 +1637,13 @@ function FilePreview({ file, focusOnOpen = false, openShareInitially = false, co
             <button onClick={onDownload}><Icon src={icons.previewDownload} />Download</button>
           </div>
         </div>
-        {loadState === 'error' || loadState === 'loading' ? (
+        {loadState === 'error' || loadState === 'loading' || loadState === 'unsupported' ? (
           <div className="previewLoadState" role={loadState === 'error' ? 'alert' : 'status'}>
-            <strong>{loadState === 'loading' ? 'Loading file…' : 'Couldn’t load this file'}</strong>
+            <strong>{loadState === 'loading' ? 'Loading file…' : loadState === 'unsupported' ? 'Preview isn’t available for this file type' : 'Couldn’t load this file'}</strong>
+            {loadState === 'unsupported' && <span>The file is stored safely and can still be downloaded.</span>}
             {loadState === 'error' && <button type="button" onClick={retryLoading}><Icon src={icons.previewRetry} />Try again</button>}
           </div>
-        ) : <article className="previewDocument" ref={previewDocumentRef} contentEditable suppressContentEditableWarning onMouseUp={showEditorForSelection} onKeyUp={showEditorForSelection} onContextMenu={(event) => { if (editorToolbarPosition) event.preventDefault() }}>
+        ) : storedPreview?.kind === 'url' ? (storedPreview.mimeType === 'application/pdf' || /\.pdf$/i.test(file.name) ? <iframe className="storedFilePreview" src={storedPreview.url} title={file.name} /> : <img className="storedFileImage" src={storedPreview.url} alt={file.name} />) : storedPreview?.kind === 'text' ? <article className="previewDocument storedTextPreview"><pre>{storedPreview.content}</pre></article> : <article className="previewDocument" ref={previewDocumentRef} contentEditable suppressContentEditableWarning onClick={(event) => { const link = (event.target as HTMLElement).closest<HTMLAnchorElement>('a[href]'); if (link && window.getSelection()?.isCollapsed) { event.preventDefault(); window.open(link.href, '_blank', 'noopener,noreferrer') } }} onMouseUp={showEditorForSelection} onKeyUp={showEditorForSelection} onContextMenu={(event) => { if (editorToolbarPosition) event.preventDefault() }}>
           <h2>{file.name}</h2>
           <p><strong>Your Folder is ready to go the moment you sign up.</strong><br />It ships with three things: `folder.md` as the root operating file, a set of reusable prompt files for common agent tasks, and a live API key created during signup.</p>
           <p><strong>The core idea</strong><br />Everything lives in one place, and `folder.md` is the entry point. Whenever an agent starts a task, it reads `folder.md` first — that&apos;s how it learns the context, the conventions, and where things belong.</p>
@@ -1260,29 +1652,70 @@ function FilePreview({ file, focusOnOpen = false, openShareInitially = false, co
           <p><strong>Handing off to an agent — what to say</strong><br />&gt; Use my Folder as the working space for this task. Read `folder.md` first, keep the file structure tidy, and explain what you saved when you&apos;re done.<br />That&apos;s it. The agent takes it from there.</p>
         </article>}
       </div>
-      {editorToolbarPosition && <TextEditorToolbar position={editorToolbarPosition} blockStyle={editorBlockStyle} isBulleted={isEditorBulleted} onFormat={applyEditorFormat} />}
+      {editorToolbarPosition && createPortal(<TextEditorToolbar position={editorToolbarPosition} blockStyle={editorBlockStyle} isBulleted={isEditorBulleted} onFormat={applyEditorFormat} />, document.body)}
     </aside>
+    {memberToRemove && <div className="newFolderBackdrop deleteItemBackdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setMemberPendingRemoval(null) }}>
+      <section className="deleteItemModal removeAccessModal" role="alertdialog" aria-modal="true" aria-labelledby="remove-access-title">
+        <header><div><img src="/assets/delete-modal-trash.svg" alt="" aria-hidden="true" /><h2 id="remove-access-title">Remove access</h2></div><button type="button" aria-label="Close remove access dialog" onClick={() => setMemberPendingRemoval(null)}><img src="/assets/delete-modal-close.svg" alt="" aria-hidden="true" /></button></header>
+        <div className="deleteItemContent">
+          <div className="removeAccessSummary"><div><span>Person</span><strong>{memberToRemove.name}</strong></div><div><span>File</span><strong>{file.name}</strong></div></div>
+          <p>They will immediately lose access to this file.</p>
+          <footer><button ref={removeAccessCancelRef} type="button" onClick={() => setMemberPendingRemoval(null)}>Cancel</button><button className="deleteItemConfirm" type="button" onClick={() => { const removedName = memberToRemove.name; onRemoveMember(memberToRemove.id); setMemberPendingRemoval(null); setAccessToast(`${removedName} no longer has access.`); if (accessToastTimerRef.current !== null) window.clearTimeout(accessToastTimerRef.current); accessToastTimerRef.current = window.setTimeout(() => setAccessToast(''), 3000) }}><img src="/assets/member-trash.svg" alt="" aria-hidden="true" />Remove access</button></footer>
+        </div>
+      </section>
+    </div>}
+    {accessToast && <div className="apiCreatedToast" role="status" aria-live="polite"><span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span><div><strong>Access removed</strong><span>{accessToast}</span></div></div>}
+    </>
   )
 }
 
-function RecentActivity() {
+function formatActivityTime(createdAt: number, now: number) {
+  const elapsedSeconds = Math.max(0, Math.floor((now - createdAt) / 1000))
+  if (elapsedSeconds < 60) return 'Just now'
+  const minutes = Math.floor(elapsedSeconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
+function RecentActivity({ activity, folderName }: { activity: FolderActivity[]; folderName: string }) {
+  const [now, setNow] = useState(Date.now())
+  const [pageSize, setPageSize] = useState(() => Math.max(1, Math.floor((window.innerHeight - 98) / 78)))
+  const [showAll, setShowAll] = useState(false)
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
+  useEffect(() => {
+    const updatePageSize = () => setPageSize(Math.max(1, Math.floor((window.innerHeight - 98) / 78)))
+    window.addEventListener('resize', updatePageSize)
+    return () => window.removeEventListener('resize', updatePageSize)
+  }, [])
+  useEffect(() => setShowAll(false), [folderName])
+  const visibleCount = showAll ? activity.length : pageSize
   return (
     <section className="recentActivity">
       <h2>Recent Activity</h2>
-      <div className="activityList">
-        {[0, 1, 2].map((item) => (
-          <div className="activityItem" key={item}>
+      {activity.length ? <div className={`activityList${showAll ? ' expanded' : ''}`}>
+        {activity.slice(0, visibleCount).map((item, index) => (
+          <div className="activityItem" key={item.id}>
             <div className="activityTrack">
               <span className="activityDot" />
-              {item < 2 && <img src={icons.activityLine} alt="" aria-hidden="true" />}
+              {index < activity.length - 1 && <img src={icons.activityLine} alt="" aria-hidden="true" />}
             </div>
             <div className="activityBody">
-              <div className="activityTop"><span>Michele J.</span><span className="activityBadge">Viewed</span><time>2h ago</time></div>
-              <p>folder.md · /folder.md</p>
+              <div className="activityTop"><span>{item.actor}</span><span className="activityBadge">{item.action}</span><time dateTime={new Date(item.createdAt).toISOString()}>{formatActivityTime(item.createdAt, now)}</time></div>
+              <p title={`${folderName} / ${item.fileName}`}>
+                <span className="activityFilePath">{folderName} /</span>
+                <span className="activityFileName">{item.fileName}</span>
+              </p>
             </div>
           </div>
         ))}
-      </div>
+        {!showAll && visibleCount < activity.length && <button className="activitySeeMore" type="button" onClick={() => setShowAll(true)}>See more<Icon src={icons.chevron} /></button>}
+      </div> : <p className="activityEmpty">No file activity yet.</p>}
     </section>
   )
 }
@@ -1300,39 +1733,111 @@ function Stats({ folderCount, fileCount, storageUsed }: { folderCount: number; f
 function ModalFocusManager() {
   useEffect(() => {
     let activeModal: HTMLElement | null = null
-    let returnFocus: HTMLElement | null = null
+    let modalStack: HTMLElement[] = []
+    let lastInteractionTarget: HTMLElement | null = null
+    const returnFocusByModal = new Map<HTMLElement, HTMLElement | null>()
+    const inertedElements = new Map<HTMLElement, boolean>()
     const focusableSelector = 'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])'
+
+    const restoreInertState = () => {
+      inertedElements.forEach((wasInert, element) => { element.inert = wasInert })
+      inertedElements.clear()
+    }
+
+    const makeBackgroundInert = (modal: HTMLElement) => {
+      restoreInertState()
+      let branch: HTMLElement = modal
+      while (branch.parentElement && branch.parentElement !== document.body) {
+        Array.from(branch.parentElement.children).forEach((sibling) => {
+          if (!(sibling instanceof HTMLElement) || sibling === branch) return
+          inertedElements.set(sibling, sibling.inert)
+          sibling.inert = true
+        })
+        branch = branch.parentElement
+      }
+    }
+
     const syncModal = () => {
       const modals = Array.from(document.querySelectorAll<HTMLElement>('[aria-modal="true"]'))
       const topModal = modals.at(-1) ?? null
       if (topModal === activeModal) return
-      if (!topModal && activeModal) {
+      const previousTop = activeModal
+      const previousFocusTarget = previousTop ? returnFocusByModal.get(previousTop) : null
+
+      if (topModal) {
+        if (!returnFocusByModal.has(topModal)) {
+          const focusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
+          const focusTarget = focusedElement && !topModal.contains(focusedElement) ? focusedElement : lastInteractionTarget
+          returnFocusByModal.set(topModal, focusTarget?.isConnected && !topModal.contains(focusTarget) ? focusTarget : null)
+        }
+        activeModal = topModal
+        modalStack = modals
+        document.body.style.overflow = 'hidden'
+        makeBackgroundInert(topModal)
+        window.requestAnimationFrame(() => {
+          if (previousTop && !modals.includes(previousTop) && previousFocusTarget?.isConnected && topModal.contains(previousFocusTarget)) {
+            previousFocusTarget.focus({ preventScroll: true })
+            return
+          }
+          topModal.querySelector<HTMLElement>('[autofocus], button:not(:disabled), input:not(:disabled), [tabindex="0"]')?.focus({ preventScroll: true })
+        })
+      } else {
+        const firstModal = modalStack[0]
+        const target = firstModal ? returnFocusByModal.get(firstModal) : previousFocusTarget
+        activeModal = null
+        modalStack = []
         document.body.style.overflow = ''
-        const target = returnFocus
-        activeModal = null; returnFocus = null
+        restoreInertState()
         if (target?.isConnected) window.requestAnimationFrame(() => target.focus({ preventScroll: true }))
+      }
+
+      Array.from(returnFocusByModal.keys()).forEach((modal) => { if (!modals.includes(modal)) returnFocusByModal.delete(modal) })
+    }
+
+    const rememberPointerTarget = (event: PointerEvent) => {
+      const target = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('button, [href], input, select, textarea, [tabindex]') : null
+      if (target) lastInteractionTarget = target
+    }
+
+    const rememberKeyboardTarget = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return
+      if (document.activeElement instanceof HTMLElement) lastInteractionTarget = document.activeElement
+    }
+
+    const handleModalKeys = (event: KeyboardEvent) => {
+      if (!activeModal) return
+      if (event.key === 'Escape') {
+        const hasOpenControl = Array.from(document.querySelectorAll<HTMLElement>('[aria-expanded="true"]')).some((control) => !control.closest('[inert]'))
+        if (hasOpenControl) return
+        const dismissButton = activeModal.querySelector<HTMLButtonElement>('[data-modal-close], button[aria-label*="close" i], button[aria-label="Cancel upload"]')
+        if (!dismissButton || dismissButton.disabled) return
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        dismissButton.click()
         return
       }
-      if (topModal) {
-        if (!activeModal) returnFocus = document.activeElement as HTMLElement
-        activeModal = topModal
-        document.body.style.overflow = 'hidden'
-        window.requestAnimationFrame(() => activeModal?.querySelector<HTMLElement>('[autofocus], button:not(:disabled), input:not(:disabled), [tabindex="0"]')?.focus({ preventScroll: true }))
-      }
-    }
-    const trapFocus = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab' || !activeModal) return
+      if (event.key !== 'Tab') return
       const controls = Array.from(activeModal.querySelectorAll<HTMLElement>(focusableSelector)).filter((control) => control.getClientRects().length > 0)
       if (!controls.length) { event.preventDefault(); activeModal.focus(); return }
       const first = controls[0]; const last = controls.at(-1)!
+      if (!activeModal.contains(document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first).focus(); return }
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
     }
     const observer = new MutationObserver(syncModal)
     observer.observe(document.body, { childList: true, subtree: true })
-    document.addEventListener('keydown', trapFocus)
+    document.addEventListener('pointerdown', rememberPointerTarget, true)
+    document.addEventListener('keydown', rememberKeyboardTarget, true)
+    document.addEventListener('keydown', handleModalKeys, true)
     syncModal()
-    return () => { observer.disconnect(); document.removeEventListener('keydown', trapFocus); document.body.style.overflow = '' }
+    return () => {
+      observer.disconnect()
+      document.removeEventListener('pointerdown', rememberPointerTarget, true)
+      document.removeEventListener('keydown', rememberKeyboardTarget, true)
+      document.removeEventListener('keydown', handleModalKeys, true)
+      document.body.style.overflow = ''
+      restoreInertState()
+    }
   }, [])
   return null
 }
@@ -1343,6 +1848,7 @@ export default function App() {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(() => window.localStorage.getItem('beam-active-workspace') || 'personal')
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? workspaces[0]
   const [workspaceContent, setWorkspaceContent] = useState<Record<string, WorkspaceContent>>(readWorkspaceContent)
+  const workspaceContentRef = useRef(workspaceContent)
   const activeContent = workspaceContent[activeWorkspace.id] ?? { folders: [], files: [], folderContents: {} }
   const folderRows = activeContent.folders
   const homeFiles = activeContent.files
@@ -1365,19 +1871,21 @@ export default function App() {
   const [isEmptyCreateOpen, setIsEmptyCreateOpen] = useState(false)
   const [settingsDirty, setSettingsDirty] = useState(false)
   const [settingsLeaveRequest, setSettingsLeaveRequest] = useState(0)
-  const [pendingView, setPendingView] = useState<AppView | null>(null)
-  const [pendingWorkspaceId, setPendingWorkspaceId] = useState<string | null>(null)
+  const pendingNavigationRef = useRef<(() => void) | null>(null)
+  const historyIndexRef = useRef(0)
+  const bypassHistoryGuardRef = useRef(false)
   const [settingsSaveToast, setSettingsSaveToast] = useState('')
   const [accountName, setAccountName] = useState(readAccountName)
   const [accountSaveToast, setAccountSaveToast] = useState('')
   const [workspaceCreateToast, setWorkspaceCreateToast] = useState('')
   const [workspaceDeleteToast, setWorkspaceDeleteToast] = useState('')
+  const [mutationNotice, setMutationNotice] = useState<MutationNotice>(null)
   const [isCreateWorkspaceOpen, setIsCreateWorkspaceOpen] = useState(() => new URLSearchParams(window.location.search).get('create-workspace') === '1')
   const settingsSaveToastTimer = useRef<number | null>(null)
   const accountSaveToastTimer = useRef<number | null>(null)
   const workspaceCreateToastTimer = useRef<number | null>(null)
   const workspaceDeleteToastTimer = useRef<number | null>(null)
-  const skipNextWorkspaceContentSave = useRef(false)
+  const mutationNoticeTimer = useRef<number | null>(null)
   const workspaceBehavior = readWorkspaceBehavior(activeWorkspace.id)
 
   const normalizedQuery = searchQuery.trim().toLowerCase()
@@ -1391,27 +1899,79 @@ export default function App() {
   const storageSummary = `${Math.round(totalStorageBytes / (1024 * 1024)).toLocaleString('en-US')} MB`
 
   useEffect(() => {
+    if (typeof window.history.state?.beamIndex !== 'number') window.history.replaceState({ ...window.history.state, beamIndex: 0 }, '', window.location.href)
+    historyIndexRef.current = window.history.state?.beamIndex ?? 0
     const restoreViewFromUrl = () => {
-      const requestedView = new URLSearchParams(window.location.search).get('view')
-      setCurrentView(requestedView === 'settings' || requestedView === 'apiKeys' || requestedView === 'account' || requestedView === 'billing' ? requestedView : 'home')
+      const parameters = new URLSearchParams(window.location.search)
+      const requestedView = parameters.get('view')
+      const destination = requestedView === 'settings' || requestedView === 'apiKeys' || requestedView === 'account' || requestedView === 'billing' ? requestedView : 'home'
+      const destinationIndex = typeof window.history.state?.beamIndex === 'number' ? window.history.state.beamIndex : historyIndexRef.current - 1
+      const historyDelta = destinationIndex - historyIndexRef.current
+      if (!bypassHistoryGuardRef.current && currentView === 'settings' && settingsDirty && destination !== 'settings') {
+        if (historyDelta) window.history.go(-historyDelta)
+        if (!pendingNavigationRef.current) {
+          pendingNavigationRef.current = () => { bypassHistoryGuardRef.current = true; window.history.go(historyDelta || -1) }
+          setSettingsLeaveRequest((request) => request + 1)
+        }
+      } else {
+        bypassHistoryGuardRef.current = false
+        historyIndexRef.current = destinationIndex
+        setCurrentView(parameters.get('folder') ? 'folder' : destination)
+        setSearchQuery(parameters.get('search') ?? '')
+        setIsSearching(Boolean(parameters.get('search')?.trim()))
+        if (parameters.get('folder')) setSelectedFolderName(parameters.get('folder')!)
+      }
     }
     window.addEventListener('popstate', restoreViewFromUrl)
     return () => window.removeEventListener('popstate', restoreViewFromUrl)
-  }, [])
+  }, [currentView, settingsDirty])
 
   useEffect(() => () => {
-    [settingsSaveToastTimer, accountSaveToastTimer, workspaceCreateToastTimer, workspaceDeleteToastTimer].forEach((timer) => {
+    [settingsSaveToastTimer, accountSaveToastTimer, workspaceCreateToastTimer, workspaceDeleteToastTimer, mutationNoticeTimer].forEach((timer) => {
       if (timer.current !== null) window.clearTimeout(timer.current)
     })
   }, [])
 
   useEffect(() => {
-    if (skipNextWorkspaceContentSave.current) {
-      skipNextWorkspaceContentSave.current = false
-      return
+    const syncWorkspaceContent = (event: StorageEvent) => {
+      if (event.key !== 'beam-workspace-content-v1' || !event.newValue) return
+      try {
+        const nextContent = JSON.parse(event.newValue) as Record<string, WorkspaceContent>
+        workspaceContentRef.current = nextContent
+        setWorkspaceContent(nextContent)
+      } catch { /* Ignore incomplete data from another tab. */ }
     }
-    window.localStorage.setItem('beam-workspace-content-v1', JSON.stringify(workspaceContent))
-  }, [workspaceContent])
+    window.addEventListener('storage', syncWorkspaceContent)
+    return () => window.removeEventListener('storage', syncWorkspaceContent)
+  }, [])
+
+  const mutateWorkspaceContent = (workspaceId: string, label: string, update: (content: WorkspaceContent) => WorkspaceContent, onConfirmed?: () => void) => {
+    if (mutationNoticeTimer.current !== null) window.clearTimeout(mutationNoticeTimer.current)
+    setMutationNotice({ state: 'saving', label })
+    const previous = workspaceContentRef.current
+    const content = previous[workspaceId] ?? { folders: [], files: [], folderContents: {} }
+    const next = { ...previous, [workspaceId]: update(content) }
+    workspaceContentRef.current = next
+    setWorkspaceContent(next)
+    try {
+      window.localStorage.setItem('beam-workspace-content-v1', JSON.stringify(next))
+      setMutationNotice({ state: 'success', label })
+      onConfirmed?.()
+      mutationNoticeTimer.current = window.setTimeout(() => setMutationNotice(null), 2400)
+    } catch {
+      workspaceContentRef.current = previous
+      setWorkspaceContent(previous)
+      setMutationNotice({ state: 'error', label })
+    }
+  }
+
+  const requestSettingsLeave = (action: () => void, replacePending = false) => {
+    if (currentView !== 'settings' || !settingsDirty) { action(); return false }
+    const hadPendingNavigation = Boolean(pendingNavigationRef.current)
+    if (!hadPendingNavigation || replacePending) pendingNavigationRef.current = action
+    if (!hadPendingNavigation) setSettingsLeaveRequest((request) => request + 1)
+    return true
+  }
 
   const commitView = (view: AppView) => {
     setCurrentView(view)
@@ -1419,38 +1979,31 @@ export default function App() {
     if (view === 'home' || view === 'folder') url.searchParams.delete('view')
     else url.searchParams.set('view', view)
     url.hash = ''
-    window.history.pushState({}, '', url)
+    historyIndexRef.current += 1
+    window.history.pushState({ beamIndex: historyIndexRef.current }, '', url)
   }
 
   const openView = (view: AppView) => {
-    if (currentView === 'settings' && settingsDirty && view !== 'settings') {
-      setPendingView(view)
-      setSettingsLeaveRequest((request) => request + 1)
-      return
-    }
-    commitView(view)
+    requestSettingsLeave(() => commitView(view))
   }
 
   const startSearch = () => {
-    setIsSidebarCollapsed(false)
+    requestSettingsLeave(() => setIsSidebarCollapsed(false))
   }
 
   const updateSearchQuery = (query: string) => {
-    setSearchQuery(query)
-    setIsSearching(query.trim().length > 0)
-    if (query.trim().length === 0) {
-      setSearchFilter('all')
-      openView('home')
-    }
+    requestSettingsLeave(() => {
+      setSearchQuery(query)
+      setIsSearching(query.trim().length > 0)
+      if (query.trim().length === 0) { setSearchFilter('all'); commitView('home') }
+    }, true)
   }
 
   const openFolder = (name: string) => {
-    setSelectedFolderName(name)
-    setSelectedSearchFileName(null)
-    openView('folder')
-    setSearchQuery('')
-    setIsSearching(false)
-    setSearchFilter('all')
+    requestSettingsLeave(() => {
+      setSelectedFolderName(name); setSelectedSearchFileName(null); commitView('folder')
+      setSearchQuery(''); setIsSearching(false); setSearchFilter('all')
+    })
   }
 
   const openSearchFile = (file: FileRow) => {
@@ -1467,11 +2020,9 @@ export default function App() {
 
   const createFolder = (name: string) => {
     if (activeContent.folders.some((folder) => folder.name.toLocaleLowerCase() === name.toLocaleLowerCase())) return
-    setWorkspaceContent((current) => ({ ...current, [activeWorkspace.id]: {
-      folders: [...activeContent.folders, { name, count: 0 }],
-      files: [...activeContent.files, { name, size: '0B', modified: 'Just now', kind: 'folder' }],
-      folderContents: { ...activeContent.folderContents, [name]: [] },
-    } }))
+    mutateWorkspaceContent(activeWorkspace.id, `Creating ${name}`, (content) => ({
+      folders: [...content.folders, { name, count: 0 }], files: [...content.files, { name, size: '0B', modified: 'Just now', kind: 'folder' }], folderContents: { ...content.folderContents, [name]: [] },
+    }))
     openView('home')
     setSearchQuery('')
     setIsSearching(false)
@@ -1480,27 +2031,23 @@ export default function App() {
   const renameFolder = (newName: string) => {
     if (!folderToRename) return
     if (activeContent.folders.some((folder) => folder.name !== folderToRename && folder.name.toLocaleLowerCase() === newName.toLocaleLowerCase())) return
-    const { [folderToRename]: renamedItems = [], ...remainingContents } = activeContent.folderContents
-    setWorkspaceContent((current) => ({ ...current, [activeWorkspace.id]: {
-      folders: activeContent.folders.map((folder) => folder.name === folderToRename ? { ...folder, name: newName } : folder),
-      files: activeContent.files.map((file) => file.name === folderToRename ? { ...file, name: newName } : file),
+    const previousName = folderToRename
+    mutateWorkspaceContent(activeWorkspace.id, `Renaming ${previousName}`, (content) => {
+      const { [previousName]: renamedItems = [], ...remainingContents } = content.folderContents
+      return {
+      folders: content.folders.map((folder) => folder.name === previousName ? { ...folder, name: newName } : folder),
+      files: content.files.map((file) => file.name === previousName ? { ...file, name: newName } : file),
       folderContents: { ...remainingContents, [newName]: renamedItems },
-    } }))
+    } })
     if (selectedFolderName === folderToRename) setSelectedFolderName(newName)
     setFolderToRename(null)
   }
 
   const removeFolder = (folderName: string) => {
-    const { [folderName]: _deletedItems, ...remainingContents } = activeContent.folderContents
-    // Folder deletion is intentionally session-only in this prototype. Preserve
-    // the current stored snapshot so refreshing restores the folder and files.
-    window.localStorage.setItem('beam-workspace-content-v1', JSON.stringify({ ...workspaceContent, [activeWorkspace.id]: activeContent }))
-    skipNextWorkspaceContentSave.current = true
-    setWorkspaceContent((current) => ({ ...current, [activeWorkspace.id]: {
-      folders: activeContent.folders.filter((folder) => folder.name !== folderName),
-      files: activeContent.files.filter((file) => file.name !== folderName),
-      folderContents: remainingContents,
-    } }))
+    let storedFilesToDelete: FolderFile[] = []
+    mutateWorkspaceContent(activeWorkspace.id, `Deleting ${folderName}`, (content) => { const { [folderName]: deletedItems = [], ...remainingContents } = content.folderContents; storedFilesToDelete = deletedItems; return {
+      folders: content.folders.filter((folder) => folder.name !== folderName), files: content.files.filter((file) => file.name !== folderName), folderContents: remainingContents,
+    } }, () => storedFilesToDelete.forEach((file) => { if (file.storageId) void deleteStoredFile(file.storageId) }))
     if (selectedFolderName === folderName) openView('home')
     setFolderToDelete(null)
   }
@@ -1522,17 +2069,31 @@ export default function App() {
     setSettingsDirty(false)
     setSearchQuery('')
     setIsSearching(false)
-    setSelectedFolderName('Folder 001')
+    setSearchFilter('all')
+    setSelectedSearchFileName(null)
+    setSelectedFolderName('')
+    setFolderToRename(null)
+    setFolderToDelete(null)
+    setIsEmptyCreateOpen(false)
+    setIsCreateWorkspaceOpen(false)
+    setShowUploadDemo(false)
+    window.sessionStorage.removeItem('beam-open-file')
+    window.sessionStorage.removeItem('beam-open-file-focus')
+  }
+
+  const commitWorkspaceHome = (workspaceId: string) => {
+    commitWorkspaceChange(workspaceId)
+    setCurrentView('home')
+    const url = new URL(window.location.href)
+    ;['view', 'folder', 'file', 'search', 'filter', 'section', 'upload-demo', 'create-workspace'].forEach((parameter) => url.searchParams.delete(parameter))
+    url.hash = ''
+    historyIndexRef.current += 1
+    window.history.pushState({ beamIndex: historyIndexRef.current }, '', url)
   }
 
   const changeWorkspace = (workspaceId: string) => {
     if (workspaceId === activeWorkspace.id) return
-    if (currentView === 'settings' && settingsDirty) {
-      setPendingWorkspaceId(workspaceId)
-      setSettingsLeaveRequest((request) => request + 1)
-      return
-    }
-    commitWorkspaceChange(workspaceId)
+    requestSettingsLeave(() => commitWorkspaceHome(workspaceId))
   }
 
   const renameWorkspace = (workspaceId: string, name: string) => {
@@ -1575,10 +2136,9 @@ export default function App() {
       { id: 'michele', name: accountName, email: accountEmail, role: 'Owner', status: 'Active' },
       ...invitations.map((invitation, index) => ({ id: `invite-${Date.now()}-${index}`, name: invitation.email.split('@')[0], email: invitation.email, role: invitation.role, status: 'Pending' })),
     ]))
-    setWorkspaceContent((current) => ({ ...current, [workspaceId]: { folders: [], files: [], folderContents: {} } }))
+    mutateWorkspaceContent(workspaceId, `Creating ${name}`, () => ({ folders: [], files: [], folderContents: {} }))
     setIsCreateWorkspaceOpen(false)
-    commitWorkspaceChange(workspaceId)
-    commitView('home')
+    commitWorkspaceHome(workspaceId)
     setWorkspaceCreateToast(`${name} is ready to use.`)
     if (workspaceCreateToastTimer.current !== null) window.clearTimeout(workspaceCreateToastTimer.current)
     workspaceCreateToastTimer.current = window.setTimeout(() => setWorkspaceCreateToast(''), 3000)
@@ -1588,14 +2148,19 @@ export default function App() {
     if (initialWorkspaces.some((workspace) => workspace.id === workspaceId)) return
     const workspaceToDelete = workspaces.find((workspace) => workspace.id === workspaceId)
     const nextWorkspaces = workspaces.filter((workspace) => workspace.id !== workspaceId)
+    const { [workspaceId]: _deletedContent, ...nextWorkspaceContent } = workspaceContent
+    setMutationNotice({ state: 'saving', label: `Deleting ${workspaceToDelete?.name ?? 'workspace'}` })
+    try { window.localStorage.setItem('beam-workspace-content-v1', JSON.stringify(nextWorkspaceContent)) }
+    catch { setMutationNotice({ state: 'error', label: `Deleting ${workspaceToDelete?.name ?? 'workspace'}` }); return }
     setWorkspaces(nextWorkspaces)
     window.localStorage.setItem('beam-created-workspaces-v1', JSON.stringify(nextWorkspaces.filter((workspace) => !initialWorkspaces.some((initial) => initial.id === workspace.id))))
-    setWorkspaceContent((current) => { const { [workspaceId]: _deletedWorkspace, ...remaining } = current; return remaining })
+    workspaceContentRef.current = nextWorkspaceContent
+    setWorkspaceContent(nextWorkspaceContent)
     ;[`beam-settings-v3-${workspaceId}`, `beam-members-v1-${workspaceId}`, `beam-api-keys-v1-${workspaceId}`, `beam-billing-v1-${workspaceId}`].forEach((key) => window.localStorage.removeItem(key))
     setSettingsDirty(false)
-    commitWorkspaceChange('personal')
-    commitView('home')
+    commitWorkspaceHome('personal')
     setWorkspaceDeleteToast(`${workspaceToDelete?.name ?? 'Workspace'} was permanently deleted.`)
+    setMutationNotice({ state: 'success', label: `Deleted ${workspaceToDelete?.name ?? 'workspace'}` })
     if (workspaceDeleteToastTimer.current !== null) window.clearTimeout(workspaceDeleteToastTimer.current)
     workspaceDeleteToastTimer.current = window.setTimeout(() => setWorkspaceDeleteToast(''), 3000)
   }
@@ -1630,16 +2195,13 @@ export default function App() {
       />
       <section className="content">
         {currentView === 'billing' && !isSearching ? <BillingUsagePage key={activeWorkspace.id} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.name} storageUsedMb={Math.round(totalStorageBytes / (1024 * 1024))} /> : currentView === 'account' && !isSearching ? <AccountProfilePage displayName={accountName} onDisplayNameSave={saveAccountName} onPasswordUpdateSuccess={showPasswordUpdateToast} /> : currentView === 'settings' && !isSearching ? <SettingsPage key={activeWorkspace.id} workspace={activeWorkspace} storageUsedMb={Math.round(totalStorageBytes / (1024 * 1024))} onOpenApiKeys={() => openView('apiKeys')} onWorkspaceNameChange={renameWorkspace} canDeleteWorkspace={!initialWorkspaces.some((workspace) => workspace.id === activeWorkspace.id)} onDeleteWorkspace={deleteWorkspace} onDirtyChange={setSettingsDirty} onSaveSuccess={showSettingsSaveToast} leaveRequest={settingsLeaveRequest} onLeaveResolved={(proceed) => {
-          if (!proceed) { setPendingView(null); setPendingWorkspaceId(null); return }
+          if (!proceed) { pendingNavigationRef.current = null; return }
           setSettingsDirty(false)
-          if (pendingWorkspaceId) { const nextWorkspaceId = pendingWorkspaceId; setPendingWorkspaceId(null); commitWorkspaceChange(nextWorkspaceId) }
-          if (pendingView) { const nextView = pendingView; setPendingView(null); commitView(nextView) }
-        }} /> : currentView === 'apiKeys' && !isSearching ? <ApiKeysPage key={activeWorkspace.id} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.name} readOnly={activeWorkspace.role === 'Viewer'} /> : currentView === 'folder' && !isSearching ? <FolderDetail key={`${activeWorkspace.id}-${selectedFolderName}`} folderName={selectedFolderName} initialItems={folderContents[selectedFolderName] ?? []} readOnly={activeWorkspace.role === 'Viewer'} defaultView={workspaceBehavior.defaultView} confirmDelete={workspaceBehavior.confirmDelete} trashRetention={workspaceBehavior.trashRetention} onItemsChange={(items) => {
-          setWorkspaceContent((current) => ({ ...current, [activeWorkspace.id]: {
-            folders: activeContent.folders.map((folder) => folder.name === selectedFolderName ? { ...folder, count: items.length } : folder),
-            files: activeContent.files.map((file) => file.name === selectedFolderName ? { ...file, size: formatFileSize(items.reduce((total, item) => total + fileSizeInBytes(item.size), 0)), modified: 'Just now' } : file),
-            folderContents: { ...activeContent.folderContents, [selectedFolderName]: items },
-          } }))
+          const action = pendingNavigationRef.current; pendingNavigationRef.current = null; action?.()
+        }} /> : currentView === 'apiKeys' && !isSearching ? <ApiKeysPage key={activeWorkspace.id} workspaceId={activeWorkspace.id} readOnly={activeWorkspace.role === 'Viewer'} /> : currentView === 'folder' && !isSearching ? <FolderDetail key={`${activeWorkspace.id}-${selectedFolderName}`} workspaceId={activeWorkspace.id} accountName={accountName} folderName={selectedFolderName} initialItems={folderContents[selectedFolderName] ?? []} initialSelectedFileName={selectedSearchFileName} readOnly={activeWorkspace.role === 'Viewer'} defaultView={workspaceBehavior.defaultView} confirmDelete={workspaceBehavior.confirmDelete} trashRetention={workspaceBehavior.trashRetention} onItemsChange={(items, removedFile) => {
+          mutateWorkspaceContent(activeWorkspace.id, `Saving ${selectedFolderName}`, (content) => ({
+            folders: content.folders.map((folder) => folder.name === selectedFolderName ? { ...folder, count: items.length } : folder), files: content.files.map((file) => file.name === selectedFolderName ? { ...file, size: formatFileSize(items.reduce((total, item) => total + fileSizeInBytes(item.size), 0)), modified: 'Just now' } : file), folderContents: { ...content.folderContents, [selectedFolderName]: items },
+          }), () => { if (removedFile?.storageId) void deleteStoredFile(removedFile.storageId) })
         }} onBack={() => setCurrentView('home')} /> : isSearching ? (
           <>
             <div className="searchFilters" aria-label="Search filters">
@@ -1649,7 +2211,7 @@ export default function App() {
                 </button>
               ))}
             </div>
-            <div className="contentGrid searchGrid">{searchResults.length ? <FileTable rows={searchResults} showHeader={false} onOpenFolder={openFolder} onOpenFile={openSearchFile} onRenameFolder={activeWorkspace.role === 'Viewer' ? undefined : setFolderToRename} onDeleteFolder={activeWorkspace.role === 'Viewer' ? undefined : requestFolderDelete} /> : <section className="searchEmptyState" role="status"><h2>No results found</h2><p>Try a different search or filter.</p></section>}<Stats folderCount={folderRows.length} fileCount={totalFileCount} storageUsed={storageSummary} /></div>
+            <div className="contentGrid searchGrid">{searchResults.length ? <><FileTable rows={searchResults} showHeader={false} onOpenFolder={openFolder} onOpenFile={openSearchFile} onRenameFolder={activeWorkspace.role === 'Viewer' ? undefined : setFolderToRename} onDeleteFolder={activeWorkspace.role === 'Viewer' ? undefined : requestFolderDelete} /><Stats folderCount={folderRows.length} fileCount={totalFileCount} storageUsed={storageSummary} /></> : <section className="searchEmptyState" role="status"><h2>No results found</h2><p>Try a different search or filter.</p></section>}</div>
           </>
         ) : (
           <>
@@ -1671,6 +2233,7 @@ export default function App() {
         )}
       </section>
       {isCreateWorkspaceOpen && <div className="createWorkspaceOverlay"><CreateWorkspacePage existingNames={workspaces.map((workspace) => workspace.name)} onCancel={() => setIsCreateWorkspaceOpen(false)} onCreate={createWorkspace} /></div>}
+      {mutationNotice && <div className={`apiCreatedToast mutationToast ${mutationNotice.state}`} role={mutationNotice.state === 'error' ? 'alert' : 'status'} aria-live="polite"><span className="apiCreatedToastIcon"><img src={mutationNotice.state === 'error' ? icons.previewClose : mutationNotice.state === 'success' ? '/assets/toast-success.svg' : '/assets/upload-progress-title.svg'} alt="" aria-hidden="true" /></span><div><strong>{mutationNotice.state === 'saving' ? 'Saving changes…' : mutationNotice.state === 'success' ? 'Changes saved' : 'Couldn’t save changes'}</strong><span>{mutationNotice.state === 'error' ? `${mutationNotice.label} was rolled back. Please try again.` : mutationNotice.label}</span></div></div>}
       {settingsSaveToast && <div className="apiCreatedToast" role="status" aria-live="polite"><span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span><div><strong>Settings saved</strong><span>{settingsSaveToast}</span></div></div>}
       {accountSaveToast && <div className="apiCreatedToast" role="status" aria-live="polite"><span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span><div><strong>Account updated</strong><span>{accountSaveToast}</span></div></div>}
       {workspaceCreateToast && <div className="apiCreatedToast" role="status" aria-live="polite"><span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span><div><strong>Workspace created</strong><span>{workspaceCreateToast}</span></div></div>}
