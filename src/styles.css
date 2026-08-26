@@ -318,10 +318,10 @@ button { border: 0; background: transparent; cursor: pointer; }
 .accountPage .accountPageHeader { height: 18px; padding: 0 8px; }
 .accountPage .accountPageHeader h1 { margin: 0; padding: 0; }
 .accountSettingsLayout { display: grid; width: 100%; min-height: 0; grid-template-columns: 168px minmax(0, 1fr) minmax(0, 744px) minmax(0, 1fr) 168px; align-items: start; }
-.accountSectionNav { position: sticky; top: 0; display: flex; width: 168px; grid-column: 1; grid-row: 1; flex-direction: column; gap: 4px; padding-top: 48.5px; }
+.accountSectionNav { position: sticky; top: 0; display: flex; width: 168px; grid-column: 1; grid-row: 1; flex-direction: column; gap: 4px; padding-top: 42px; }
 .accountSectionNav button { width: 100%; height: 22px; padding: 2px 8px; border-radius: 4px; text-align: left; }
 .accountSectionNav button.active { background: #f0f0f0; }
-.accountPageContent { display: flex; width: 100%; min-width: 0; grid-column: 3; grid-row: 1; flex-direction: column; gap: 24px; padding: 36px 0 80px; overflow-y: auto; overscroll-behavior: contain; }
+.accountPageContent { display: flex; width: 100%; min-width: 0; grid-column: 3; grid-row: 1; flex-direction: column; gap: 24px; padding: 42px 0 80px; overflow-y: auto; overscroll-behavior: contain; }
 .accountLayoutSpacer { display: none; }
 .profileGroup { scroll-margin-top: 22px; overflow: hidden; border: .5px solid rgba(0,0,0,.2); border-radius: 4px; background: #fff; }
 .profileGroup > header { height: 35px; padding: 8px 12px; border-bottom: .5px solid var(--border); background: #f5f5f5; }
@@ -868,11 +868,11 @@ h1 { margin: 0 0 12px; padding-left: 8px; font-size: 12px; line-height: 18px; fo
 .settingsPageHeader { width: 100%; }
 .settingsPageHeader h1 { margin-bottom: 0; }
 .settingsLayout { display: grid; width: 100%; grid-template-columns: 168px minmax(0, 1fr) minmax(0, 744px) minmax(0, 1fr) 168px; align-items: start; }
-.settingsNav { position: sticky; top: 0; display: flex; grid-column: 1; grid-row: 1; flex-direction: column; gap: 4px; padding-top: 48.5px; }
+.settingsNav { position: sticky; top: 0; display: flex; grid-column: 1; grid-row: 1; flex-direction: column; gap: 4px; padding-top: 42px; }
 .settingsNav button { display: flex; width: 168px; height: 22px; align-items: center; padding: 2px 8px; border-radius: 4px; text-align: left; }
 .settingsNav button.active, .settingsNav button:hover, .settingsNav button:focus-visible { outline: 0; background: #f0f0f0; }
 .settingsMobileNav { display: none; }
-.settingsContent { display: flex; width: 100%; min-width: 0; grid-column: 3; grid-row: 1; flex-direction: column; gap: 16px; padding: 36px 0 80px; overflow-y: auto; overscroll-behavior: contain; }
+.settingsContent { display: flex; width: 100%; min-width: 0; grid-column: 3; grid-row: 1; flex-direction: column; gap: 16px; padding: 42px 0 80px; overflow-y: auto; overscroll-behavior: contain; }
 .settingsGroup { scroll-margin-top: 16px; overflow: visible; border: .5px solid rgba(0,0,0,.2); border-radius: 4px; background: #fff; }
 .settingsGroup:has(.settingsSelect.open) { position: relative; z-index: 20; }
 .settingsGroup > header { height: 35px; padding: 8px 12px; border-bottom: .5px solid var(--border); border-radius: 3.5px 3.5px 0 0; background: #f5f5f5; background-clip: padding-box; }

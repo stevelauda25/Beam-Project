@@ -393,7 +393,7 @@ export default function ApiKeysPage({ workspaceId, readOnly = false }: { workspa
           <SelectField label="Permission" value={permission} options={['Admin', 'Write']} onChange={setPermission} />
           <SelectField label="Expires" value={expires} options={['No expiry', '30 days', '90 days']} onChange={setExpires} />
           <button className="createApiKey" type="submit" disabled={!isFormValid}>
-            <img src={apiIcons.plus} alt="" aria-hidden="true" />Create API Key
+            <img src={apiIcons.plus} alt="" aria-hidden="true" />Create API key
           </button>
         </div>
         <div className="apiKeyHint" id="api-key-name-feedback"><span className={isNameTouched && nameError ? 'apiNameError' : ''} role={isNameTouched && nameError ? 'alert' : undefined}>{isNameTouched && nameError ? nameError : 'Create an API key for apps, scripts, or agents. The full key is shown only once.'}</span></div>

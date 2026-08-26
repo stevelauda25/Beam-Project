@@ -570,22 +570,22 @@ function RenameFolderModal({ currentName, existingNames, onRename, onClose }: { 
   )
 }
 
-function DeleteItemModal({ itemName, itemType, retention = '30 days', onConfirm, onClose }: { itemName: string; itemType: 'file' | 'folder'; retention?: string; onConfirm: () => void; onClose: () => void }) {
+function DeleteItemModal({ itemName, itemType, onConfirm, onClose }: { itemName: string; itemType: 'file' | 'folder'; onConfirm: () => void; onClose: () => void }) {
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
     document.addEventListener('keydown', closeOnEscape)
     return () => document.removeEventListener('keydown', closeOnEscape)
   }, [onClose])
   const message = itemType === 'folder'
-    ? `‘${itemName}’ and all files inside it will be moved to Trash. Shared links to these files will stop working immediately. You can restore the folder from Trash for ${retention} before it is permanently deleted.`
-    : `‘${itemName}’ will be moved to Trash. Its shared link will stop working immediately. You can restore the file from Trash for ${retention} before it is permanently deleted.`
+    ? `‘${itemName}’ and all files inside it will be permanently deleted. Shared links to these files will stop working immediately. This action can’t be undone.`
+    : `‘${itemName}’ will be permanently deleted. Its shared link will stop working immediately. This action can’t be undone.`
   return (
     <div className="newFolderBackdrop deleteItemBackdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <section className="deleteItemModal" role="alertdialog" aria-modal="true" aria-labelledby="delete-item-title">
         <header><div><img src="/assets/delete-modal-trash.svg" alt="" aria-hidden="true" /><h2 id="delete-item-title">Delete {itemType}</h2></div><button type="button" aria-label="Close delete dialog" onClick={onClose}><img src="/assets/delete-modal-close.svg" alt="" aria-hidden="true" /></button></header>
         <div className="deleteItemContent">
           <p>{message}</p>
-          <footer><button type="button" onClick={onClose}>Cancel</button><button className="deleteItemConfirm" type="button" onClick={onConfirm}><img src="/assets/delete-modal-confirm.svg" alt="" aria-hidden="true" />Delete now</button></footer>
+          <footer><button type="button" onClick={onClose}>Cancel</button><button className="deleteItemConfirm" type="button" onClick={onConfirm}><img src="/assets/delete-modal-confirm.svg" alt="" aria-hidden="true" />Delete permanently</button></footer>
         </div>
       </section>
     </div>
@@ -686,7 +686,7 @@ const unsupportedUploadMessage = (files: File[]) => {
   return `${names} can’t be uploaded. Supported formats: ${supportedUploadLabel}.`
 }
 
-function FolderDetail({ workspaceId = window.localStorage.getItem('beam-active-workspace') || 'personal', accountName, folderName, initialItems, initialSelectedFileName, onItemsChange, onBack, readOnly = false, defaultView = 'list', confirmDelete = true, trashRetention = '30 days' }: { workspaceId?: string; accountName: string; folderName: string; initialItems: FolderFile[]; initialSelectedFileName?: string | null; onItemsChange: (items: FolderFile[], removedFile?: FolderFile) => void; onBack: () => void; readOnly?: boolean; defaultView?: 'list' | 'grid'; confirmDelete?: boolean; trashRetention?: string }) {
+function FolderDetail({ workspaceId = window.localStorage.getItem('beam-active-workspace') || 'personal', accountName, folderName, initialItems, initialSelectedFileName, onItemsChange, onBack, readOnly = false, defaultView = 'list', confirmDelete = true }: { workspaceId?: string; accountName: string; folderName: string; initialItems: FolderFile[]; initialSelectedFileName?: string | null; onItemsChange: (items: FolderFile[], removedFile?: FolderFile) => void; onBack: () => void; readOnly?: boolean; defaultView?: 'list' | 'grid'; confirmDelete?: boolean }) {
   const uploadRecoveryKey = `beam-pending-upload-v1-${workspaceId}-${folderName}`
   const activityStorageKey = `beam-folder-activity-v1-${workspaceId}-${folderName}`
   const shareStorageKey = `beam-file-sharing-v1-${workspaceId}-${folderName}`
@@ -822,7 +822,7 @@ function FolderDetail({ workspaceId = window.localStorage.getItem('beam-active-w
 
   const openGridContextMenu = (index: number, origin: HTMLButtonElement, clientX: number, clientY: number) => {
     const menuWidth = 140
-    const menuHeight = readOnly ? 84 : 110
+    const menuHeight = readOnly ? 36 : 110
     gridContextOriginRef.current = origin
     setOpenFileMenu(index)
     setGridContextMenuPosition({ left: Math.max(8, Math.min(clientX, window.innerWidth - menuWidth - 8)), top: Math.max(8, Math.min(clientY, window.innerHeight - menuHeight - 8)) })
@@ -1049,9 +1049,7 @@ function FolderDetail({ workspaceId = window.localStorage.getItem('beam-active-w
             {openFileMenu === index && (
               <div data-menu-for={index} className="rowMenu detailRowMenu" role="menu" aria-label={`Actions for ${file.name}`} onKeyDown={handleFileMenuKeyDown}>
                 <button className="darkIcon" type="button" role="menuitem" onClick={() => { setInfoFile(file); setOpenFileMenu(null) }}><Icon src={icons.previewInfo} />Info</button>
-                <button className="darkIcon" type="button" role="menuitem" onClick={() => { void copyFileLink(file); setOpenFileMenu(null) }}><Icon src={icons.previewCopy} />Copy link</button>
-                <button className="darkIcon" type="button" role="menuitem" onClick={() => { downloadFile(file); setOpenFileMenu(null) }}><Icon src={icons.previewDownload} />Download</button>
-                {!readOnly && <button type="button" role="menuitem" onClick={() => { if (confirmDelete) setFileToDelete({ file, index }); else removeFile(file, index); setOpenFileMenu(null) }}><Icon src={icons.actionDelete} />Delete</button>}
+                {!readOnly && <><button className="darkIcon" type="button" role="menuitem" onClick={() => { void copyFileLink(file); setOpenFileMenu(null) }}><Icon src={icons.previewCopy} />Copy link</button><button className="darkIcon" type="button" role="menuitem" onClick={() => { downloadFile(file); setOpenFileMenu(null) }}><Icon src={icons.previewDownload} />Download</button><button type="button" role="menuitem" onClick={() => { if (confirmDelete) setFileToDelete({ file, index }); else removeFile(file, index); setOpenFileMenu(null) }}><Icon src={icons.actionDelete} />Delete</button></>}
               </div>
             )}
           </div>
@@ -1074,9 +1072,7 @@ function FolderDetail({ workspaceId = window.localStorage.getItem('beam-active-w
       ))}
       {gridContextMenuPosition && openFileMenu !== null && folderItems[openFileMenu] && (() => { const file = folderItems[openFileMenu]; const index = openFileMenu; return <div data-detail-row-menu data-grid-context-menu className="rowMenu detailRowMenu gridContextMenu" style={gridContextMenuPosition} role="menu" aria-label={`Actions for ${file.name}`} onKeyDown={handleFileMenuKeyDown}>
         <button className="darkIcon" type="button" role="menuitem" onClick={() => { setInfoFile(file); setOpenFileMenu(null); setGridContextMenuPosition(null) }}><Icon src={icons.previewInfo} />Info</button>
-        <button className="darkIcon" type="button" role="menuitem" onClick={() => { const origin = gridContextOriginRef.current; setShareFileName(file.name); setOpenFileMenu(null); setGridContextMenuPosition(null); if (origin) openPreview(file, origin, true, false) }}><Icon src={icons.previewShare} />Share</button>
-        <button className="darkIcon" type="button" role="menuitem" onClick={() => { void downloadFile(file); setOpenFileMenu(null); setGridContextMenuPosition(null) }}><Icon src={icons.previewDownload} />Download</button>
-        {!readOnly && <button type="button" role="menuitem" onClick={() => { if (confirmDelete) setFileToDelete({ file, index }); else removeFile(file, index); setOpenFileMenu(null); setGridContextMenuPosition(null) }}><Icon src={icons.actionDelete} />Delete</button>}
+        {!readOnly && <><button className="darkIcon" type="button" role="menuitem" onClick={() => { const origin = gridContextOriginRef.current; setShareFileName(file.name); setOpenFileMenu(null); setGridContextMenuPosition(null); if (origin) openPreview(file, origin, true, false) }}><Icon src={icons.previewShare} />Share</button><button className="darkIcon" type="button" role="menuitem" onClick={() => { void downloadFile(file); setOpenFileMenu(null); setGridContextMenuPosition(null) }}><Icon src={icons.previewDownload} />Download</button><button type="button" role="menuitem" onClick={() => { if (confirmDelete) setFileToDelete({ file, index }); else removeFile(file, index); setOpenFileMenu(null); setGridContextMenuPosition(null) }}><Icon src={icons.actionDelete} />Delete</button></>}
       </div> })()}
     </div>
   )
@@ -1093,7 +1089,7 @@ function FolderDetail({ workspaceId = window.localStorage.getItem('beam-active-w
       {selectedFile ? (
         <div className={`previewLayout${isResizing ? ' resizing' : ''}`} ref={previewLayoutRef}>
           <div className="detailMain" style={{ flexBasis: `${splitPercent}%` }}>{detailHeader}{viewMode === 'grid' ? detailGridView : detailTable}</div>
-          <FilePreview file={selectedFile} accountName={accountName} shareSettings={fileShares[selectedFile.name] ?? { members: [], linkAccess: 'restricted', token: '' }} focusOnOpen={focusPreviewOnOpen} openShareInitially={shareFileName === selectedFile.name} copyFeedback={copyFeedback?.fileName === selectedFile.name ? copyFeedback : null} onCopyLink={() => copyFileLink(selectedFile)} onMemberRoleChange={(memberId, role) => { updateFileShare(selectedFile.name, (current) => ({ ...current, members: current.members.map((member) => member.id === memberId ? { ...member, role } : member) })); recordActivity('Shared', selectedFile.name) }} onRemoveMember={(memberId) => { updateFileShare(selectedFile.name, (current) => ({ ...current, members: current.members.filter((member) => member.id !== memberId) })); recordActivity('Shared', selectedFile.name) }} onLinkAccessChange={(linkAccess) => { updateFileShare(selectedFile.name, (current) => ({ ...current, linkAccess })); recordActivity('Shared', selectedFile.name) }} onDownload={() => downloadFile(selectedFile)} onInfo={() => setInfoFile(selectedFile)} onClose={closePreview} />
+          <FilePreview file={selectedFile} accountName={accountName} shareSettings={fileShares[selectedFile.name] ?? { members: [], linkAccess: 'restricted', token: '' }} readOnly={readOnly} focusOnOpen={focusPreviewOnOpen} openShareInitially={shareFileName === selectedFile.name} copyFeedback={copyFeedback?.fileName === selectedFile.name ? copyFeedback : null} onCopyLink={() => copyFileLink(selectedFile)} onMemberRoleChange={(memberId, role) => { updateFileShare(selectedFile.name, (current) => ({ ...current, members: current.members.map((member) => member.id === memberId ? { ...member, role } : member) })); recordActivity('Shared', selectedFile.name) }} onRemoveMember={(memberId) => { updateFileShare(selectedFile.name, (current) => ({ ...current, members: current.members.filter((member) => member.id !== memberId) })); recordActivity('Shared', selectedFile.name) }} onLinkAccessChange={(linkAccess) => { updateFileShare(selectedFile.name, (current) => ({ ...current, linkAccess })); recordActivity('Shared', selectedFile.name) }} onDownload={() => downloadFile(selectedFile)} onInfo={() => setInfoFile(selectedFile)} onClose={closePreview} />
           <div
             className="paneHandle"
             style={{ left: `${splitPercent}%` }}
@@ -1145,7 +1141,7 @@ function FolderDetail({ workspaceId = window.localStorage.getItem('beam-active-w
       {infoFile && <FileActivityModal file={infoFile} onClose={() => setInfoFile(null)} />}
       {downloadFeedback && <DownloadToast feedback={downloadFeedback} onRetry={() => downloadFile(downloadFeedback.file)} onClose={() => setDownloadFeedback(null)} />}
       {uploadNotice && <div className="downloadToast failure uploadRecoveryToast" role="alert" aria-live="polite"><Icon src={icons.previewClose} /><div className="downloadToastText"><strong>{!navigator.onLine ? 'You’re offline' : uploadNotice.startsWith('An upload is already') ? 'Upload already in progress' : 'Upload interrupted'}</strong><span>{uploadNotice}</span></div><button className="downloadToastClose" type="button" onClick={() => { setUploadNotice(null); window.sessionStorage.removeItem(uploadRecoveryKey) }} aria-label="Dismiss upload notice" /></div>}
-      {fileToDelete && <DeleteItemModal itemName={fileToDelete.file.name} itemType="file" retention={trashRetention} onClose={() => setFileToDelete(null)} onConfirm={() => { removeFile(fileToDelete.file, fileToDelete.index); setFileToDelete(null) }} />}
+      {fileToDelete && <DeleteItemModal itemName={fileToDelete.file.name} itemType="file" onClose={() => setFileToDelete(null)} onConfirm={() => { removeFile(fileToDelete.file, fileToDelete.index); setFileToDelete(null) }} />}
       {pendingUpload && <UploadDemoOverlay
         files={pendingUpload.map((file) => ({
           name: file.name,
@@ -1373,24 +1369,44 @@ function TextEditorToolbar({ position, blockStyle, isBulleted, onFormat }: { pos
 function ShareRoleControl({ member, onChange }: { member: ShareMember; onChange: (role: ShareRole) => void }) {
   const [isOpen, setIsOpen] = useState(false)
   const controlRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!isOpen) return
     const close = (event: MouseEvent) => { if (!controlRef.current?.contains(event.target as Node)) setIsOpen(false) }
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.stopPropagation(); setIsOpen(false) } }
     document.addEventListener('mousedown', close)
-    document.addEventListener('keydown', closeOnEscape)
-    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', closeOnEscape) }
+    window.requestAnimationFrame(() => {
+      const selected = menuRef.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')
+      ;(selected ?? menuRef.current?.querySelector<HTMLButtonElement>('[role="option"]'))?.focus()
+    })
+    return () => document.removeEventListener('mousedown', close)
   }, [isOpen])
-  return <div className="shareMemberRoleControl" ref={controlRef}>
-    <button type="button" aria-haspopup="listbox" aria-expanded={isOpen} onClick={() => setIsOpen((open) => !open)}>{member.role}<img src="/assets/share-extra-1.svg" alt="" aria-hidden="true" /></button>
-    {isOpen && <div className="shareMemberRoleMenu" role="listbox" aria-label={`Role for ${member.email}`}>{(['Viewer', 'Editor'] as const).map((role) => <button type="button" role="option" aria-selected={member.role === role} key={role} onClick={() => { onChange(role); setIsOpen(false) }}><span>{role}</span>{member.role === role && <img src="/assets/workspace-menu-check.svg" alt="" aria-hidden="true" />}</button>)}</div>}
+  const handleMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault(); event.stopPropagation(); setIsOpen(false)
+      window.requestAnimationFrame(() => triggerRef.current?.focus())
+      return
+    }
+    const options = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="option"]'))
+    const current = options.indexOf(document.activeElement as HTMLButtonElement)
+    let next = current
+    if (event.key === 'ArrowDown') next = (current + 1) % options.length
+    else if (event.key === 'ArrowUp') next = (current - 1 + options.length) % options.length
+    else if (event.key === 'Home') next = 0
+    else if (event.key === 'End') next = options.length - 1
+    else return
+    event.preventDefault(); options[next]?.focus()
+  }
+  return <div className="shareMemberRoleControl" ref={controlRef} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsOpen(false) }}>
+    <button ref={triggerRef} type="button" aria-haspopup="listbox" aria-expanded={isOpen} onClick={() => setIsOpen((open) => !open)}>{member.role}<img src="/assets/share-extra-1.svg" alt="" aria-hidden="true" /></button>
+    {isOpen && <div ref={menuRef} className="shareMemberRoleMenu" role="listbox" aria-label={`Role for ${member.email}`} onKeyDown={handleMenuKeyDown}>{(['Viewer', 'Editor'] as const).map((role) => <button type="button" role="option" aria-selected={member.role === role} key={role} onClick={() => { onChange(role); setIsOpen(false); window.requestAnimationFrame(() => triggerRef.current?.focus()) }}><span>{role}</span>{member.role === role && <img src="/assets/workspace-menu-check.svg" alt="" aria-hidden="true" />}</button>)}</div>}
   </div>
 }
 
-function FilePreview({ file, accountName, shareSettings, focusOnOpen = false, openShareInitially = false, copyFeedback, onCopyLink, onMemberRoleChange, onRemoveMember, onLinkAccessChange, onDownload, onInfo, onClose }: { file: FolderFile; accountName: string; shareSettings: FileShareSettings; focusOnOpen?: boolean; openShareInitially?: boolean; copyFeedback: CopyFeedback; onCopyLink: () => void; onMemberRoleChange: (memberId: string, role: ShareRole) => void; onRemoveMember: (memberId: string) => void; onLinkAccessChange: (access: ShareLinkAccess) => void; onDownload: () => void; onInfo: () => void; onClose: (restoreFocus?: boolean) => void }) {
+function FilePreview({ file, accountName, shareSettings, readOnly = false, focusOnOpen = false, openShareInitially = false, copyFeedback, onCopyLink, onMemberRoleChange, onRemoveMember, onLinkAccessChange, onDownload, onInfo, onClose }: { file: FolderFile; accountName: string; shareSettings: FileShareSettings; readOnly?: boolean; focusOnOpen?: boolean; openShareInitially?: boolean; copyFeedback: CopyFeedback; onCopyLink: () => void; onMemberRoleChange: (memberId: string, role: ShareRole) => void; onRemoveMember: (memberId: string) => void; onLinkAccessChange: (access: ShareLinkAccess) => void; onDownload: () => void; onInfo: () => void; onClose: (restoreFocus?: boolean) => void }) {
   const [loadState, setLoadState] = useState<'loaded' | 'loading' | 'unsupported' | 'error'>(file.storageId ? 'loading' : file.previewAvailable === false ? 'error' : 'loaded')
   const [storedPreview, setStoredPreview] = useState<{ kind: 'text'; content: string } | { kind: 'url'; url: string; mimeType: string } | null>(null)
-  const [isShareOpen, setIsShareOpen] = useState(openShareInitially)
+  const [isShareOpen, setIsShareOpen] = useState(!readOnly && openShareInitially)
   const [isLinkAccessOpen, setIsLinkAccessOpen] = useState(false)
   const [memberPendingRemoval, setMemberPendingRemoval] = useState<string | null>(null)
   const [accessToast, setAccessToast] = useState('')
@@ -1402,6 +1418,8 @@ function FilePreview({ file, accountName, shareSettings, focusOnOpen = false, op
   const editorSelectionRef = useRef<Range | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const shareTriggerRef = useRef<HTMLButtonElement>(null)
+  const linkAccessTriggerRef = useRef<HTMLButtonElement>(null)
+  const linkAccessMenuRef = useRef<HTMLDivElement>(null)
   const removeAccessCancelRef = useRef<HTMLButtonElement>(null)
   const accessToastTimerRef = useRef<number | null>(null)
 
@@ -1425,7 +1443,8 @@ function FilePreview({ file, accountName, shareSettings, focusOnOpen = false, op
       } catch { if (!disposed) setLoadState('error') }
     }
     void load()
-    setIsShareOpen(openShareInitially)
+    setIsShareOpen(!readOnly && openShareInitially)
+    setIsLinkAccessOpen(false)
     if (focusOnOpen) window.requestAnimationFrame(() => closeButtonRef.current?.focus({ preventScroll: true }))
     return () => {
       disposed = true
@@ -1433,7 +1452,7 @@ function FilePreview({ file, accountName, shareSettings, focusOnOpen = false, op
       if (retryTimerRef.current !== null) window.clearTimeout(retryTimerRef.current)
       if (accessToastTimerRef.current !== null) window.clearTimeout(accessToastTimerRef.current)
     }
-  }, [file, focusOnOpen, openShareInitially])
+  }, [file, focusOnOpen, openShareInitially, readOnly])
 
   useEffect(() => {
     const closeEditor = (event: MouseEvent) => {
@@ -1460,18 +1479,39 @@ function FilePreview({ file, accountName, shareSettings, focusOnOpen = false, op
   useEffect(() => { if (memberPendingRemoval) window.requestAnimationFrame(() => removeAccessCancelRef.current?.focus()) }, [memberPendingRemoval])
 
   useEffect(() => {
+    if (!isLinkAccessOpen) return
+    window.requestAnimationFrame(() => {
+      const selected = linkAccessMenuRef.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')
+      ;(selected ?? linkAccessMenuRef.current?.querySelector<HTMLButtonElement>('[role="option"]'))?.focus()
+    })
+  }, [isLinkAccessOpen])
+
+  useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       event.preventDefault()
       if (editorToolbarPosition) setEditorToolbarPosition(null)
       else if (memberPendingRemoval) setMemberPendingRemoval(null)
-      else if (isLinkAccessOpen) setIsLinkAccessOpen(false)
+      else if (isLinkAccessOpen) { setIsLinkAccessOpen(false); window.requestAnimationFrame(() => linkAccessTriggerRef.current?.focus()) }
       else if (isShareOpen) { setIsShareOpen(false); window.requestAnimationFrame(() => shareTriggerRef.current?.focus()) }
       else onClose(focusOnOpen)
     }
     document.addEventListener('keydown', closeOnEscape)
     return () => document.removeEventListener('keydown', closeOnEscape)
   }, [editorToolbarPosition, focusOnOpen, isLinkAccessOpen, isShareOpen, memberPendingRemoval, onClose])
+
+  const handleLinkAccessKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') return
+    const options = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="option"]'))
+    const current = options.indexOf(document.activeElement as HTMLButtonElement)
+    let next = current
+    if (event.key === 'ArrowDown') next = (current + 1) % options.length
+    else if (event.key === 'ArrowUp') next = (current - 1 + options.length) % options.length
+    else if (event.key === 'Home') next = 0
+    else if (event.key === 'End') next = options.length - 1
+    else return
+    event.preventDefault(); options[next]?.focus()
+  }
 
   const retryLoading = () => {
     setLoadState('loading')
@@ -1601,7 +1641,7 @@ function FilePreview({ file, accountName, shareSettings, focusOnOpen = false, op
           </div>
           <div className="previewActions">
             <button onClick={onInfo}><Icon src={icons.previewInfo} />Info</button>
-            <div className="shareControl" data-share-control>
+            {!readOnly && <div className="shareControl" data-share-control>
               <button ref={shareTriggerRef} className="shareButton" type="button" aria-haspopup="dialog" aria-expanded={isShareOpen} onClick={() => setIsShareOpen((open) => !open)}><Icon src={icons.previewShare} />Share</button>
               {isShareOpen && (
                 <section className="sharePopover" role="dialog" aria-label={`Share ${file.name}`}>
@@ -1623,9 +1663,9 @@ function FilePreview({ file, accountName, shareSettings, focusOnOpen = false, op
                     </div>
                     <div className="shareFooter">
                       <div className="sharePermissionControl">
-                        <button className="sharePermission" type="button" aria-haspopup="listbox" aria-expanded={isLinkAccessOpen} onClick={() => setIsLinkAccessOpen((open) => !open)}>{shareSettings.linkAccess === 'restricted' ? 'Restricted' : shareSettings.linkAccess === 'viewer' ? 'Anyone with link · Viewer' : 'Anyone with link · Editor'}<img src="/assets/share-extra-1.svg" alt="" aria-hidden="true" /></button>
-                        {isLinkAccessOpen && <div className="sharePermissionMenu" role="listbox" aria-label="Link access">
-                          {([['restricted', 'Restricted'], ['viewer', 'Anyone with link · Viewer'], ['editor', 'Anyone with link · Editor']] as const).map(([value, label]) => <button type="button" role="option" aria-selected={shareSettings.linkAccess === value} key={value} onClick={() => { onLinkAccessChange(value); setIsLinkAccessOpen(false) }}><span>{label}</span>{shareSettings.linkAccess === value && <img src="/assets/workspace-menu-check.svg" alt="" aria-hidden="true" />}</button>)}
+                        <button ref={linkAccessTriggerRef} className="sharePermission" type="button" aria-haspopup="listbox" aria-expanded={isLinkAccessOpen} onClick={() => setIsLinkAccessOpen((open) => !open)}>{shareSettings.linkAccess === 'restricted' ? 'Restricted' : shareSettings.linkAccess === 'viewer' ? 'Anyone with link · Viewer' : 'Anyone with link · Editor'}<img src="/assets/share-extra-1.svg" alt="" aria-hidden="true" /></button>
+                        {isLinkAccessOpen && <div ref={linkAccessMenuRef} className="sharePermissionMenu" role="listbox" aria-label="Link access" onKeyDown={handleLinkAccessKeyDown} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsLinkAccessOpen(false) }}>
+                          {([['restricted', 'Restricted'], ['viewer', 'Anyone with link · Viewer'], ['editor', 'Anyone with link · Editor']] as const).map(([value, label]) => <button type="button" role="option" aria-selected={shareSettings.linkAccess === value} key={value} onClick={() => { onLinkAccessChange(value); setIsLinkAccessOpen(false); window.requestAnimationFrame(() => linkAccessTriggerRef.current?.focus()) }}><span>{label}</span>{shareSettings.linkAccess === value && <img src="/assets/workspace-menu-check.svg" alt="" aria-hidden="true" />}</button>)}
                         </div>}
                       </div>
                       <button className="shareCopyLink" type="button" onClick={onCopyLink}><img src={copyFeedback?.status === 'success' ? icons.downloadSuccess : copyFeedback?.status === 'failure' ? icons.previewClose : '/assets/share-chevron.svg'} alt="" />{copyFeedback?.status === 'success' ? 'Link copied' : copyFeedback?.status === 'failure' ? 'Copy failed' : 'Copy link'}</button>
@@ -1633,8 +1673,8 @@ function FilePreview({ file, accountName, shareSettings, focusOnOpen = false, op
                   </div>
                 </section>
               )}
-            </div>
-            <button onClick={onDownload}><Icon src={icons.previewDownload} />Download</button>
+            </div>}
+            {!readOnly && <button onClick={onDownload}><Icon src={icons.previewDownload} />Download</button>}
           </div>
         </div>
         {loadState === 'error' || loadState === 'loading' || loadState === 'unsupported' ? (
@@ -2198,7 +2238,7 @@ export default function App() {
           if (!proceed) { pendingNavigationRef.current = null; return }
           setSettingsDirty(false)
           const action = pendingNavigationRef.current; pendingNavigationRef.current = null; action?.()
-        }} /> : currentView === 'apiKeys' && !isSearching ? <ApiKeysPage key={activeWorkspace.id} workspaceId={activeWorkspace.id} readOnly={activeWorkspace.role === 'Viewer'} /> : currentView === 'folder' && !isSearching ? <FolderDetail key={`${activeWorkspace.id}-${selectedFolderName}`} workspaceId={activeWorkspace.id} accountName={accountName} folderName={selectedFolderName} initialItems={folderContents[selectedFolderName] ?? []} initialSelectedFileName={selectedSearchFileName} readOnly={activeWorkspace.role === 'Viewer'} defaultView={workspaceBehavior.defaultView} confirmDelete={workspaceBehavior.confirmDelete} trashRetention={workspaceBehavior.trashRetention} onItemsChange={(items, removedFile) => {
+        }} /> : currentView === 'apiKeys' && !isSearching ? <ApiKeysPage key={activeWorkspace.id} workspaceId={activeWorkspace.id} readOnly={activeWorkspace.role === 'Viewer'} /> : currentView === 'folder' && !isSearching ? <FolderDetail key={`${activeWorkspace.id}-${selectedFolderName}`} workspaceId={activeWorkspace.id} accountName={accountName} folderName={selectedFolderName} initialItems={folderContents[selectedFolderName] ?? []} initialSelectedFileName={selectedSearchFileName} readOnly={activeWorkspace.role === 'Viewer'} defaultView={workspaceBehavior.defaultView} confirmDelete={workspaceBehavior.confirmDelete} onItemsChange={(items, removedFile) => {
           mutateWorkspaceContent(activeWorkspace.id, `Saving ${selectedFolderName}`, (content) => ({
             folders: content.folders.map((folder) => folder.name === selectedFolderName ? { ...folder, count: items.length } : folder), files: content.files.map((file) => file.name === selectedFolderName ? { ...file, size: formatFileSize(items.reduce((total, item) => total + fileSizeInBytes(item.size), 0)), modified: 'Just now' } : file), folderContents: { ...content.folderContents, [selectedFolderName]: items },
           }), () => { if (removedFile?.storageId) void deleteStoredFile(removedFile.storageId) })
@@ -2239,7 +2279,7 @@ export default function App() {
       {workspaceCreateToast && <div className="apiCreatedToast" role="status" aria-live="polite"><span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span><div><strong>Workspace created</strong><span>{workspaceCreateToast}</span></div></div>}
       {workspaceDeleteToast && <div className="apiCreatedToast" role="status" aria-live="polite"><span className="apiCreatedToastIcon"><img src="/assets/toast-success.svg" alt="" aria-hidden="true" /></span><div><strong>Workspace deleted</strong><span>{workspaceDeleteToast}</span></div></div>}
       {folderToRename && <RenameFolderModal currentName={folderToRename} existingNames={folderRows.map((folder) => folder.name)} onRename={renameFolder} onClose={() => setFolderToRename(null)} />}
-      {folderToDelete && <DeleteItemModal itemName={folderToDelete} itemType="folder" retention={workspaceBehavior.trashRetention} onConfirm={() => removeFolder(folderToDelete)} onClose={() => setFolderToDelete(null)} />}
+      {folderToDelete && <DeleteItemModal itemName={folderToDelete} itemType="folder" onConfirm={() => removeFolder(folderToDelete)} onClose={() => setFolderToDelete(null)} />}
       {isEmptyCreateOpen && <NewFolderModal existingNames={folderRows.map((folder) => folder.name)} onCreate={(name) => { createFolder(name); setIsEmptyCreateOpen(false) }} onClose={() => setIsEmptyCreateOpen(false)} />}
       {showUploadDemo && <UploadDemoOverlay onClose={() => { setShowUploadDemo(false); const url = new URL(window.location.href); url.searchParams.delete('upload-demo'); window.history.replaceState({}, '', url) }} />}
     </main>
